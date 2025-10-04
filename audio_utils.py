@@ -21,60 +21,41 @@ class AudioUtils:
         if not PYDUB_AVAILABLE:
             self.logger.warning("pydub غير متاح - بعض الميزات قد لا تعمل")
     
-    def create_timed_segment(self, audio_file: str, start_silence_ms: float, 
-                           duration_ms: float, pause_ms: float = 500) -> Optional[AudioSegment]:
-        """
-        إنشاء مقطع صوتي مع توقيت محدد
-        
-        Args:
-            audio_file (str): مسار الملف الصوتي
-            start_silence_ms (float): الصمت في البداية (بالميلي ثانية)
-            duration_ms (float): مدة المقطع المطلوبة
-            pause_ms (float): مدة التوقف في النهاية
-            
-        Returns:
-            AudioSegment: المقطع الصوتي أو None
-        """
+    def load_audio(self, audio_file: str) -> Optional[AudioSegment]:
+        """تحميل ملف صوتي"""
         if not PYDUB_AVAILABLE:
-            self.logger.error("pydub مطلوب لمعالجة الصوت")
             return None
         
         try:
-            # تحميل الملف الصوتي
-            audio = AudioSegment.from_file(audio_file)
-            
-            # إنشاء صمت في البداية
-            if start_silence_ms > 0:
-                start_silence = AudioSegment.silent(duration=int(start_silence_ms))
-            else:
-                start_silence = AudioSegment.empty()
-            
-            # تعديل سرعة الصوت ليناسب المدة المطلوبة
-            audio_duration = len(audio)
-            target_duration = duration_ms - pause_ms
-            
-            if target_duration > 0 and audio_duration > 0:
-                # تعديل السرعة إذا كانت المدة مختلفة
-                speed_ratio = audio_duration / target_duration
-                if speed_ratio != 1.0:
-                    # تغيير السرعة مع الحفاظ على الطبقة الصوتية
-                    audio = audio._spawn(audio.raw_data, overrides={
-                        "frame_rate": int(audio.frame_rate * speed_ratio)
-                    }).set_frame_rate(audio.frame_rate)
-            
-            # إضافة توقف في النهاية
-            if pause_ms > 0:
-                end_pause = AudioSegment.silent(duration=int(pause_ms))
-                audio = audio + end_pause
-            
-            # دمج الصمت مع الصوت
-            final_segment = start_silence + audio
-            
-            return final_segment
-            
+            return AudioSegment.from_file(audio_file)
         except Exception as e:
-            self.logger.error(f"خطأ في إنشاء المقطع الصوتي: {str(e)}")
+            self.logger.error(f"خطأ في تحميل الملف الصوتي: {str(e)}")
             return None
+    
+    def create_silence(self, duration_ms: float) -> Optional[AudioSegment]:
+        """إنشاء فترة صمت"""
+        if not PYDUB_AVAILABLE:
+            return None
+        
+        try:
+            return AudioSegment.silent(duration=int(duration_ms))
+        except Exception as e:
+            self.logger.error(f"خطأ في إنشاء الصمت: {str(e)}")
+            return None
+    
+    def add_pause(self, audio: AudioSegment, pause_ms: float) -> Optional[AudioSegment]:
+        """إضافة توقف في نهاية المقطع الصوتي"""
+        if not PYDUB_AVAILABLE or not audio:
+            return audio
+        
+        try:
+            if pause_ms > 0:
+                pause = AudioSegment.silent(duration=int(pause_ms))
+                return audio + pause
+            return audio
+        except Exception as e:
+            self.logger.error(f"خطأ في إضافة التوقف: {str(e)}")
+            return audio
     
     def combine_audio_segments(self, segments: List[AudioSegment]) -> Optional[AudioSegment]:
         """
@@ -130,7 +111,7 @@ class AudioUtils:
                 output_path,
                 format=format,
                 bitrate=bitrate,
-                parameters=["-ar", "22050"]  # تقليل معدل العينة لتوفير المساحة
+                parameters=["-ar", "16000"]  # معدل عينة منخفض لتقليل الحجم
             )
             
             # التحقق من نجاح التصدير
