@@ -65,17 +65,23 @@ def fetch_lahajati_voices(api_key):
             
             if 'data' in data:
                 for voice in data['data']:
-                    voice_id = voice.get('id', '')
-                    voice_name = voice.get('voice_name', 'صوت غير معروف')
+                    voice_id = voice.get('id', voice.get('voice_id', ''))
+                    voice_name = voice.get('voice_name', voice.get('name', voice.get('display_name', '')))
+                    
+                    if not voice_name or voice_name.strip() == '':
+                        voice_name = f"صوت {voice_id[:8]}" if voice_id else "صوت غير معروف"
+                    
                     gender_id = voice.get('gender', 0)
-                    tags = voice.get('voice_tags', '')
+                    tags = voice.get('voice_tags', voice.get('tags', ''))
                     
                     gender_map = {1: '🙎 ذكر', 2: '🙍 أنثى', 3: '👶 طفل'}
                     gender = gender_map.get(gender_id, '')
                     
-                    display_name = f"{voice_name} {gender}"
+                    display_name = f"{voice_name}"
+                    if gender:
+                        display_name += f" {gender}"
                     if tags:
-                        display_name += f" ({tags})"
+                        display_name += f" • {tags}"
                     
                     voices.append({
                         'id': voice_id,
@@ -225,6 +231,15 @@ def main():
                         
                         st.info(f"**الصوت المختار:** {voice_names[selected_voice_index]}")
                         st.caption(f"🔑 Voice ID: `{lahajati_voice_id}`")
+                        
+                        with st.expander("🔍 عرض تفاصيل الصوت المختار", expanded=False):
+                            selected_voice = voices_list[selected_voice_index]
+                            st.json({
+                                'اسم الصوت': selected_voice.get('voice_name', ''),
+                                'النوع': selected_voice.get('gender', ''),
+                                'الوسوم': selected_voice.get('tags', ''),
+                                'المعرّف': selected_voice.get('id', '')
+                            })
                         
                         if lahajati_voice_id:
                             os.environ['LAHAJATI_VOICE_ID'] = lahajati_voice_id
