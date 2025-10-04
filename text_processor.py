@@ -93,12 +93,13 @@ class TextProcessor:
             return ""
         
         try:
+            # إضافة التشكيل أولاً للنص الخام (قبل أي تنظيف)
+            # هذا يحسن دقة التشكيل لأن mishkal يحتاج السياق الكامل
+            if add_tashkeel and self.tashkeel_engine:
+                text = self.add_tashkeel(text)
+            
             # تنظيف أولي
             processed_text = self._clean_text(text)
-            
-            # إضافة التشكيل قبل معالجة الأرقام والترقيم
-            if add_tashkeel and self.tashkeel_engine:
-                processed_text = self.add_tashkeel(processed_text)
             
             # معالجة الأرقام
             processed_text = self._process_numbers(processed_text)
