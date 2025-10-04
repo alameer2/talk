@@ -226,7 +226,6 @@ def convert_to_speech(subtitles, file_name, tts_engine, speech_rate, output_form
         if output_format == "ملف صوتي واحد متكامل":
             # إنشاء ملف صوتي واحد
             audio_segments = []
-            last_end_time = 0
             
             for i, subtitle in enumerate(subtitles):
                 progress = (i + 1) / len(subtitles)
@@ -244,23 +243,22 @@ def convert_to_speech(subtitles, file_name, tts_engine, speech_rate, output_form
                     audio_file = tts.text_to_speech(processed_text, f"temp/subtitle_{i}.wav")
                     
                     if audio_file:
-                        # حساب الفجوة بين السطر الحالي والسطر السابق
-                        gap_ms = (subtitle['start_time'] - last_end_time) * 1000
+                        # حساب التوقيت الدقيق مع الصمت
+                        start_silence = subtitle['start_time'] * 1000
+                        duration = (subtitle['end_time'] - subtitle['start_time']) * 1000
                         
                         # تحميل الملف الصوتي
                         audio = audio_util.load_audio(audio_file)
                         if audio:
-                            # إضافة الفجوة قبل هذا السطر (إن وجدت)
-                            if gap_ms > 0:
-                                gap_silence = audio_util.create_silence(gap_ms)
-                                audio_segments.append(gap_silence)
-                            
-                            # إضافة الصوت مع توقف في النهاية
-                            audio_with_pause = audio_util.add_pause(audio, pause_duration * 1000)
-                            audio_segments.append(audio_with_pause)
-                            
-                            # تحديث وقت النهاية
-                            last_end_time = subtitle['end_time']
+                            # إنشاء المقطع مع الصمت في البداية
+                            segment = audio_util.create_timed_segment_optimized(
+                                audio, 
+                                start_silence, 
+                                duration,
+                                pause_duration * 1000
+                            )
+                            if segment:
+                                audio_segments.append(segment)
             
             if audio_segments:
                 status_text.text("🔧 دمج ملفات الصوت...")
