@@ -298,8 +298,8 @@ def main():
                             lahajati_voice_id = voice_ids[selected_voice_index]
                             selected_voice = filtered_voices[selected_voice_index]
                             
-                            st.info(f"**الصوت المختار:** {voice_names[selected_voice_index]}")
-                            st.caption(f"🔑 Voice ID: `{lahajati_voice_id}`")
+                            st.success(f"✅ **الصوت المختار:** {voice_names[selected_voice_index]}")
+                            st.code(f"🔑 Voice ID: {lahajati_voice_id}", language=None)
                             
                             if selected_voice.get('preview_url'):
                                 st.markdown("### 🎧 معاينة الصوت")
