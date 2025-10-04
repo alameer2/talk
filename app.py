@@ -197,16 +197,26 @@ def main():
             - **مجاني: 10,000 حرف/شهر** (بدون بطاقة ائتمان)
             - سجّل مجاناً على: https://lahajati.ai/
             """)
+            
+            st.markdown("### 📋 خطوات الاستخدام:")
+            st.markdown("""
+            1. أدخل **API Key** في الحقل أدناه
+            2. انتظر تحميل قائمة الأصوات
+            3. **اختر الصوت** المناسب من القائمة
+            4. ابدأ التحويل أو المعاينة
+            """)
+            
             with st.expander("⚙️ إعدادات Lahajati", expanded=True):
                 lahajati_key = st.text_input(
-                    "Lahajati API Key:",
+                    "🔑 Lahajati API Key:",
                     type="password",
                     key="lahajati_key",
                     help="احصل على مفتاح API مجاناً من لوحة التحكم في lahajati.ai"
                 )
                 
                 if not lahajati_key:
-                    st.warning("⚠️ يجب توفير API Key لاستخدام Lahajati. سجّل مجاناً على lahajati.ai للحصول على 10,000 حرف/شهر!")
+                    st.error("⚠️ **خطوة إلزامية:** يجب توفير API Key لاستخدام Lahajati.")
+                    st.info("📝 سجّل مجاناً على [lahajati.ai](https://lahajati.ai/) للحصول على 10,000 حرف/شهر!")
                     lahajati_voice_id = None
                 else:
                     os.environ['LAHAJATI_API_KEY'] = lahajati_key
@@ -566,6 +576,12 @@ def main():
                     st.subheader("🎧 استماع لعينة صوتية")
                     st.info("استمع إلى أول 3 سطور لضبط الإعدادات قبل التحويل الكامل")
                     
+                    # تحذير خاص لـ Lahajati
+                    if "Lahajati" in tts_engine:
+                        lahajati_voice_check = os.getenv('LAHAJATI_VOICE_ID')
+                        if not lahajati_voice_check:
+                            st.warning("⚠️ **مطلوب:** يجب اختيار صوت من قائمة Lahajati في الشريط الجانبي أولاً!")
+                    
                     preview_count = st.slider(
                         "عدد السطور للمعاينة:",
                         min_value=1,
@@ -588,6 +604,8 @@ def main():
                         if preview_audio:
                             st.audio(preview_audio, format='audio/mp3')
                             st.success(f"✅ تم إنشاء معاينة لأول {preview_count} سطور")
+                        else:
+                            st.error("❌ فشل إنشاء المعاينة. تحقق من إعدادات المحرك في الشريط الجانبي.")
                 
                 # أزرار التحويل
                 st.markdown("---")
