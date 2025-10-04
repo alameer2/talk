@@ -1,6 +1,6 @@
 import pysrt
 import re
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import logging
 
 class SRTProcessor:
@@ -151,7 +151,7 @@ class SRTProcessor:
     
     def filter_subtitles_by_time(self, subtitles: List[Dict[str, Any]], 
                                 start_time: float = 0, 
-                                end_time: float = None) -> List[Dict[str, Any]]:
+                                end_time: Optional[float] = None) -> List[Dict[str, Any]]:
         """تصفية الترجمات حسب نطاق زمني محدد"""
         if end_time is None:
             end_time = float('inf')

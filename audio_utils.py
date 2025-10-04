@@ -219,7 +219,10 @@ class AudioUtils:
             )
             
             if chunks:
-                return sum(chunks)
+                combined = AudioSegment.empty()
+                for chunk in chunks:
+                    combined += chunk
+                return combined
             else:
                 return audio_segment
                 

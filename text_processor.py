@@ -131,7 +131,7 @@ class TextProcessor:
             # تطبيق اتجاه النص (من اليمين إلى اليسار)
             bidi_text = get_display(reshaped_text)
             
-            return bidi_text
+            return str(bidi_text)
             
         except Exception as e:
             self.logger.warning(f"تعذر تطبيق التشكيل العربي: {str(e)}")
