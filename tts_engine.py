@@ -385,55 +385,114 @@ class TTSEngine:
     
     def _lahajati_convert(self, text: str, output_file: str) -> Optional[str]:
         """تحويل النص باستخدام Lahajati AI (108 لهجة عربية)"""
-        try:
-            if not REQUESTS_AVAILABLE:
-                self.logger.error("requests library غير متاح. قم بتثبيت: pip install requests")
-                return None
-            
-            if not self.api_key:
-                self.logger.error("يجب توفير API Key لـ Lahajati. يمكنك الحصول عليه مجاناً (10k chars/month) من https://lahajati.ai/")
-                return None
-            
-            # الحصول على voice_id من credentials - يجب أن يكون موجوداً
-            voice_id = self.credentials.get('voice_id', None)
-            
-            if not voice_id:
-                self.logger.error("يجب اختيار صوت من القائمة أولاً. اذهب إلى إعدادات Lahajati واختر الصوت المناسب.")
-                return None
-            
-            # إعداد الطلب
-            api_url = 'https://lahajati.ai/api/v1/text-to-speech-pro'
-            headers = {
-                'Authorization': f'Bearer {self.api_key}',
-                'Content-Type': 'application/json',
-                'Accept': 'audio/mpeg'
-            }
-            
-            data = {
-                "text": text,
-                "id_voice": voice_id,
-                "version": "lahajati_text_to_speech_pro_v1"
-            }
-            
-            # إرسال الطلب
-            response = requests.post(api_url, headers=headers, json=data, stream=True, timeout=30)
-            
-            if response.status_code == 200:
-                # حفظ الملف الصوتي
-                with open(output_file, 'wb') as f:
-                    for chunk in response.iter_content(chunk_size=8192):
-                        if chunk:
-                            f.write(chunk)
-                
-                if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
-                    self.logger.info(f"تم إنشاء ملف صوتي بـ Lahajati: {output_file}")
-                    return output_file
-                else:
+        max_retries = 3
+        retry_delay = 1
+        
+        for attempt in range(max_retries):
+            try:
+                if not REQUESTS_AVAILABLE:
+                    self.logger.error("requests library غير متاح. قم بتثبيت: pip install requests")
                     return None
-            else:
-                self.logger.error(f"خطأ في Lahajati API: {response.status_code} - {response.text}")
-                return None
                 
-        except Exception as e:
-            self.logger.error(f"خطأ في Lahajati: {str(e)}")
-            return None
+                if not self.api_key:
+                    self.logger.error("❌ يجب توفير API Key لـ Lahajati. يمكنك الحصول عليه مجاناً (10k chars/month) من https://lahajati.ai/")
+                    return None
+                
+                voice_id = self.credentials.get('voice_id', None)
+                
+                if not voice_id:
+                    self.logger.error("❌ يجب اختيار صوت من القائمة أولاً. اذهب إلى إعدادات Lahajati في الشريط الجانبي واختر الصوت المناسب.")
+                    return None
+                
+                api_url = 'https://lahajati.ai/api/v1/text-to-speech-pro'
+                headers = {
+                    'Authorization': f'Bearer {self.api_key}',
+                    'Content-Type': 'application/json',
+                    'Accept': 'audio/mpeg'
+                }
+                
+                data = {
+                    "text": text,
+                    "id_voice": voice_id,
+                    "version": "lahajati_text_to_speech_pro_v1"
+                }
+                
+                self.logger.info(f"🔄 محاولة {attempt + 1}/{max_retries} - إرسال طلب إلى Lahajati API...")
+                response = requests.post(api_url, headers=headers, json=data, stream=True, timeout=60)
+                
+                if response.status_code == 200:
+                    with open(output_file, 'wb') as f:
+                        for chunk in response.iter_content(chunk_size=8192):
+                            if chunk:
+                                f.write(chunk)
+                    
+                    if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
+                        self.logger.info(f"✅ تم إنشاء ملف صوتي بـ Lahajati: {output_file}")
+                        return output_file
+                    else:
+                        self.logger.error("❌ الملف الناتج فارغ")
+                        return None
+                        
+                elif response.status_code == 401:
+                    self.logger.error("❌ خطأ 401: API Key غير صحيح أو منتهي الصلاحية. تأكد من API Key في https://lahajati.ai/")
+                    return None
+                    
+                elif response.status_code == 403:
+                    self.logger.error("❌ خطأ 403: تجاوزت حدود الاستخدام المجاني (10k حرف/شهر) أو ليس لديك صلاحية.")
+                    return None
+                    
+                elif response.status_code == 422:
+                    error_details = response.json() if response.headers.get('content-type') == 'application/json' else response.text
+                    self.logger.error(f"❌ خطأ 422: بيانات غير صحيحة - {error_details}")
+                    return None
+                    
+                elif response.status_code == 429:
+                    if attempt < max_retries - 1:
+                        wait_time = retry_delay * (2 ** attempt)
+                        self.logger.warning(f"⏳ خطأ 429: طلبات كثيرة. انتظار {wait_time} ثانية...")
+                        import time
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        self.logger.error("❌ خطأ 429: تجاوزت عدد الطلبات المسموح. حاول لاحقاً.")
+                        return None
+                        
+                elif response.status_code >= 500:
+                    if attempt < max_retries - 1:
+                        wait_time = retry_delay * (2 ** attempt)
+                        self.logger.warning(f"⚠️ خطأ {response.status_code}: مشكلة في السيرفر. إعادة المحاولة بعد {wait_time} ثانية...")
+                        import time
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        self.logger.error(f"❌ خطأ {response.status_code}: مشكلة في سيرفر Lahajati. حاول لاحقاً.")
+                        return None
+                else:
+                    self.logger.error(f"❌ خطأ {response.status_code}: {response.text}")
+                    return None
+                    
+            except requests.exceptions.Timeout:
+                if attempt < max_retries - 1:
+                    self.logger.warning(f"⏱️ انتهت مهلة الاتصال. محاولة {attempt + 2}/{max_retries}...")
+                    import time
+                    time.sleep(retry_delay)
+                    continue
+                else:
+                    self.logger.error("❌ انتهت مهلة الاتصال بعد عدة محاولات. تحقق من اتصال الإنترنت.")
+                    return None
+                    
+            except requests.exceptions.ConnectionError:
+                if attempt < max_retries - 1:
+                    self.logger.warning(f"🔌 خطأ في الاتصال. محاولة {attempt + 2}/{max_retries}...")
+                    import time
+                    time.sleep(retry_delay)
+                    continue
+                else:
+                    self.logger.error("❌ فشل الاتصال بـ Lahajati API. تحقق من اتصال الإنترنت.")
+                    return None
+                    
+            except Exception as e:
+                self.logger.error(f"❌ خطأ غير متوقع في Lahajati: {str(e)}")
+                return None
+        
+        return None
