@@ -83,6 +83,12 @@ def main():
             value=True,
             help="إضافة توقف طبيعي عند الفواصل وعلامات التعجب"
         )
+        
+        add_tashkeel = st.checkbox(
+            "إضافة التشكيل التلقائي",
+            value=False,
+            help="إضافة الحركات (التشكيل) للنص العربي لتحسين النطق الصحيح"
+        )
     
     # المحتوى الرئيسي
     col1, col2 = st.columns([2, 1])
@@ -189,13 +195,14 @@ def main():
                     output_format, 
                     audio_quality, 
                     pause_duration, 
-                    handle_punctuation
+                    handle_punctuation,
+                    add_tashkeel
                 )
         
         except Exception as e:
             st.error(f"❌ خطأ في قراءة الملف: {str(e)}")
 
-def convert_to_speech(subtitles, file_name, tts_engine, speech_rate, output_format, audio_quality, pause_duration, handle_punctuation):
+def convert_to_speech(subtitles, file_name, tts_engine, speech_rate, output_format, audio_quality, pause_duration, handle_punctuation, add_tashkeel=False):
     """تحويل الترجمات إلى كلام"""
     
     # شريط التقدم
@@ -235,7 +242,9 @@ def convert_to_speech(subtitles, file_name, tts_engine, speech_rate, output_form
                 # معالجة النص
                 processed_text = text_proc.process_arabic_text(
                     subtitle['text'], 
-                    handle_punctuation
+                    handle_punctuation,
+                    for_tts=True,
+                    add_tashkeel=add_tashkeel
                 )
                 
                 if processed_text.strip():
@@ -291,7 +300,9 @@ def convert_to_speech(subtitles, file_name, tts_engine, speech_rate, output_form
                 # معالجة النص
                 processed_text = text_proc.process_arabic_text(
                     subtitle['text'], 
-                    handle_punctuation
+                    handle_punctuation,
+                    for_tts=True,
+                    add_tashkeel=add_tashkeel
                 )
                 
                 if processed_text.strip():
