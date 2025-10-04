@@ -26,6 +26,22 @@ This is a Python-based SRT (subtitle) to Arabic speech converter application. Th
 - Tested and verified TTS conversion works correctly (successfully created 27KB audio file)
 - Created test SRT file for validation (upload/test_lahajati.srt)
 
+### October 4, 2025 - Lahajati Advanced Features
+- **Added**: Complete Absolute Control API support for advanced voice customization
+- **Features Implemented**:
+  - Dialect selection (110 Arabic dialects available)
+  - Performance style selection (1996+ performance types: dramatic, news, commercial, etc.)
+  - Custom prompt support (free-text description for voice characteristics)
+- **Technical Implementation**:
+  - Added `fetch_lahajati_dialects()` and `fetch_lahajati_performances()` with pagination support
+  - Added advanced options UI with two control modes: structured selection and custom prompt
+  - Modified `TTSEngine._lahajati_convert()` to automatically switch between `text-to-speech-pro` and `text-to-speech-absolute-control` endpoints
+  - Credentials forwarding system to pass dialect_id, performance_id, and custom_prompt through the conversion pipeline
+- **User Experience**:
+  - Advanced options are optional and collapsed by default
+  - Clear UI guidance with examples for custom prompts
+  - Seamless fallback to basic API when advanced options are not used
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
