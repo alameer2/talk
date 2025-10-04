@@ -5,6 +5,7 @@ import shutil
 from pathlib import Path
 import time
 import json
+import requests
 
 # استيراد الوحدات المخصصة
 from srt_processor import SRTProcessor
@@ -45,6 +46,53 @@ def save_user_preferences(preferences):
             json.dump(preferences, f, ensure_ascii=False, indent=2)
     except Exception as e:
         st.warning(f"تعذر حفظ الإعدادات: {str(e)}")
+
+@st.cache_data(ttl=3600)
+def fetch_lahajati_voices(api_key):
+    """جلب قائمة الأصوات المتاحة من Lahajati API"""
+    try:
+        url = 'https://lahajati.ai/api/v1/voices'
+        headers = {
+            'Authorization': f'Bearer {api_key}',
+            'Accept': 'application/json'
+        }
+        
+        response = requests.get(url, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            voices = []
+            
+            if 'data' in data:
+                for voice in data['data']:
+                    voice_id = voice.get('id', '')
+                    voice_name = voice.get('voice_name', 'صوت غير معروف')
+                    gender_id = voice.get('gender', 0)
+                    tags = voice.get('voice_tags', '')
+                    
+                    gender_map = {1: '🙎 ذكر', 2: '🙍 أنثى', 3: '👶 طفل'}
+                    gender = gender_map.get(gender_id, '')
+                    
+                    display_name = f"{voice_name} {gender}"
+                    if tags:
+                        display_name += f" ({tags})"
+                    
+                    voices.append({
+                        'id': voice_id,
+                        'name': display_name,
+                        'voice_name': voice_name,
+                        'gender': gender,
+                        'tags': tags
+                    })
+            
+            return voices
+        else:
+            st.error(f"خطأ في جلب الأصوات: {response.status_code}")
+            return []
+            
+    except Exception as e:
+        st.error(f"فشل الاتصال بـ Lahajati API: {str(e)}")
+        return []
 
 def main():
     create_directories()
@@ -143,27 +191,53 @@ def main():
             - **مجاني: 10,000 حرف/شهر** (بدون بطاقة ائتمان)
             - سجّل مجاناً على: https://lahajati.ai/
             """)
-            with st.expander("⚙️ إعدادات Lahajati (اختياري)", expanded=False):
+            with st.expander("⚙️ إعدادات Lahajati", expanded=True):
                 lahajati_key = st.text_input(
                     "Lahajati API Key:",
                     type="password",
                     key="lahajati_key",
                     help="احصل على مفتاح API مجاناً من لوحة التحكم في lahajati.ai"
                 )
-                lahajati_voice_id = st.text_input(
-                    "Voice ID (معرّف الصوت):",
-                    value="",
-                    key="lahajati_voice",
-                    help="يمكنك الحصول على قائمة الأصوات من API endpoint: /voices-absolute-control"
-                )
                 
                 if not lahajati_key:
                     st.warning("⚠️ يجب توفير API Key لاستخدام Lahajati. سجّل مجاناً على lahajati.ai للحصول على 10,000 حرف/شهر!")
-                
-                if lahajati_key:
+                    lahajati_voice_id = None
+                else:
                     os.environ['LAHAJATI_API_KEY'] = lahajati_key
-                    if lahajati_voice_id:
-                        os.environ['LAHAJATI_VOICE_ID'] = lahajati_voice_id
+                    
+                    with st.spinner("🔄 جاري تحميل قائمة الأصوات..."):
+                        voices_list = fetch_lahajati_voices(lahajati_key)
+                    
+                    if voices_list:
+                        st.success(f"✅ تم العثور على {len(voices_list)} صوت!")
+                        
+                        voice_names = [v['name'] for v in voices_list]
+                        voice_ids = [v['id'] for v in voices_list]
+                        
+                        selected_voice_index = st.selectbox(
+                            "🎤 اختر الصوت:",
+                            range(len(voice_names)),
+                            format_func=lambda i: voice_names[i],
+                            help="اختر الصوت المناسب من القائمة"
+                        )
+                        
+                        lahajati_voice_id = voice_ids[selected_voice_index]
+                        
+                        st.info(f"**الصوت المختار:** {voice_names[selected_voice_index]}")
+                        st.caption(f"🔑 Voice ID: `{lahajati_voice_id}`")
+                        
+                        if lahajati_voice_id:
+                            os.environ['LAHAJATI_VOICE_ID'] = lahajati_voice_id
+                    else:
+                        st.warning("⚠️ لم نتمكن من جلب قائمة الأصوات. تأكد من صحة API Key.")
+                        lahajati_voice_id = st.text_input(
+                            "Voice ID (معرّف الصوت) - إدخال يدوي:",
+                            value="",
+                            key="lahajati_voice_manual",
+                            help="أدخل معرّف الصوت يدوياً"
+                        )
+                        if lahajati_voice_id:
+                            os.environ['LAHAJATI_VOICE_ID'] = lahajati_voice_id
         
         if "Azure" in tts_engine:
             st.info("🎯 **Azure TTS:** أصوات احترافية بجودة عالية جداً.")
