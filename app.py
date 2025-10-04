@@ -49,52 +49,68 @@ def save_user_preferences(preferences):
 
 @st.cache_data(ttl=3600)
 def fetch_lahajati_voices(api_key):
-    """جلب قائمة الأصوات المتاحة من Lahajati API"""
+    """جلب قائمة الأصوات المتاحة من Lahajati API مع دعم pagination"""
     try:
-        url = 'https://lahajati.ai/api/v1/voices'
-        headers = {
-            'Authorization': f'Bearer {api_key}',
-            'Accept': 'application/json'
-        }
+        all_voices = []
+        page = 1
+        per_page = 50
         
-        response = requests.get(url, headers=headers, timeout=10)
+        while True:
+            url = f'https://lahajati.ai/api/v1/voices?page={page}&per_page={per_page}'
+            headers = {
+                'Authorization': f'Bearer {api_key}',
+                'Accept': 'application/json'
+            }
+            
+            response = requests.get(url, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                if 'data' in data and len(data['data']) > 0:
+                    for voice in data['data']:
+                        voice_id = voice.get('id', voice.get('voice_id', ''))
+                        voice_name = voice.get('voice_name', voice.get('name', voice.get('display_name', '')))
+                        
+                        if not voice_name or voice_name.strip() == '':
+                            voice_name = f"صوت {voice_id[:8]}" if voice_id else "صوت غير معروف"
+                        
+                        gender_id = voice.get('gender', 0)
+                        tags = voice.get('voice_tags', voice.get('tags', ''))
+                        dialect = voice.get('dialect', voice.get('accent', ''))
+                        
+                        gender_map = {1: '🙎 ذكر', 2: '🙍 أنثى', 3: '👶 طفل'}
+                        gender = gender_map.get(gender_id, '')
+                        
+                        display_name = f"{voice_name}"
+                        if gender:
+                            display_name += f" {gender}"
+                        if dialect:
+                            display_name += f" • {dialect}"
+                        elif tags:
+                            display_name += f" • {tags}"
+                        
+                        all_voices.append({
+                            'id': voice_id,
+                            'name': display_name,
+                            'voice_name': voice_name,
+                            'gender': gender,
+                            'tags': tags,
+                            'dialect': dialect,
+                            'preview_url': voice.get('preview_url', voice.get('sample_url', ''))
+                        })
+                    
+                    if len(data['data']) < per_page:
+                        break
+                    page += 1
+                else:
+                    break
+            else:
+                if page == 1:
+                    st.error(f"خطأ في جلب الأصوات: {response.status_code}")
+                break
         
-        if response.status_code == 200:
-            data = response.json()
-            voices = []
-            
-            if 'data' in data:
-                for voice in data['data']:
-                    voice_id = voice.get('id', voice.get('voice_id', ''))
-                    voice_name = voice.get('voice_name', voice.get('name', voice.get('display_name', '')))
-                    
-                    if not voice_name or voice_name.strip() == '':
-                        voice_name = f"صوت {voice_id[:8]}" if voice_id else "صوت غير معروف"
-                    
-                    gender_id = voice.get('gender', 0)
-                    tags = voice.get('voice_tags', voice.get('tags', ''))
-                    
-                    gender_map = {1: '🙎 ذكر', 2: '🙍 أنثى', 3: '👶 طفل'}
-                    gender = gender_map.get(gender_id, '')
-                    
-                    display_name = f"{voice_name}"
-                    if gender:
-                        display_name += f" {gender}"
-                    if tags:
-                        display_name += f" • {tags}"
-                    
-                    voices.append({
-                        'id': voice_id,
-                        'name': display_name,
-                        'voice_name': voice_name,
-                        'gender': gender,
-                        'tags': tags
-                    })
-            
-            return voices
-        else:
-            st.error(f"خطأ في جلب الأصوات: {response.status_code}")
-            return []
+        return all_voices
             
     except Exception as e:
         st.error(f"فشل الاتصال بـ Lahajati API: {str(e)}")
@@ -227,32 +243,75 @@ def main():
                     if voices_list:
                         st.success(f"✅ تم العثور على {len(voices_list)} صوت!")
                         
-                        voice_names = [v['name'] for v in voices_list]
-                        voice_ids = [v['id'] for v in voices_list]
+                        all_dialects = sorted(set([v.get('dialect', '') for v in voices_list if v.get('dialect', '')]))
+                        all_genders = sorted(set([v.get('gender', '') for v in voices_list if v.get('gender', '')]))
                         
-                        selected_voice_index = st.selectbox(
-                            "🎤 اختر الصوت:",
-                            range(len(voice_names)),
-                            format_func=lambda i: voice_names[i],
-                            help="اختر الصوت المناسب من القائمة"
+                        col_filter1, col_filter2 = st.columns(2)
+                        with col_filter1:
+                            dialect_filter = st.selectbox(
+                                "🗣️ تصفية حسب اللهجة:",
+                                ["الكل"] + all_dialects,
+                                help="اختر لهجة معينة أو عرض الكل"
+                            )
+                        
+                        with col_filter2:
+                            gender_filter = st.selectbox(
+                                "👤 تصفية حسب النوع:",
+                                ["الكل"] + all_genders,
+                                help="اختر نوع الصوت"
+                            )
+                        
+                        search_text = st.text_input(
+                            "🔍 بحث في الأصوات:",
+                            placeholder="ابحث بالاسم...",
+                            help="ابحث عن صوت محدد بالاسم"
                         )
                         
-                        lahajati_voice_id = voice_ids[selected_voice_index]
+                        filtered_voices = voices_list
+                        if dialect_filter != "الكل":
+                            filtered_voices = [v for v in filtered_voices if v.get('dialect', '') == dialect_filter]
+                        if gender_filter != "الكل":
+                            filtered_voices = [v for v in filtered_voices if v.get('gender', '') == gender_filter]
+                        if search_text:
+                            filtered_voices = [v for v in filtered_voices if search_text.lower() in v.get('voice_name', '').lower()]
                         
-                        st.info(f"**الصوت المختار:** {voice_names[selected_voice_index]}")
-                        st.caption(f"🔑 Voice ID: `{lahajati_voice_id}`")
-                        
-                        with st.expander("🔍 عرض تفاصيل الصوت المختار", expanded=False):
-                            selected_voice = voices_list[selected_voice_index]
-                            st.json({
-                                'اسم الصوت': selected_voice.get('voice_name', ''),
-                                'النوع': selected_voice.get('gender', ''),
-                                'الوسوم': selected_voice.get('tags', ''),
-                                'المعرّف': selected_voice.get('id', '')
-                            })
-                        
-                        if lahajati_voice_id:
-                            os.environ['LAHAJATI_VOICE_ID'] = lahajati_voice_id
+                        if filtered_voices:
+                            st.info(f"📊 عدد الأصوات المتاحة: {len(filtered_voices)} من {len(voices_list)}")
+                            
+                            voice_names = [v['name'] for v in filtered_voices]
+                            voice_ids = [v['id'] for v in filtered_voices]
+                            
+                            selected_voice_index = st.selectbox(
+                                "🎤 اختر الصوت:",
+                                range(len(voice_names)),
+                                format_func=lambda i: voice_names[i],
+                                help="اختر الصوت المناسب من القائمة"
+                            )
+                            
+                            lahajati_voice_id = voice_ids[selected_voice_index]
+                            selected_voice = filtered_voices[selected_voice_index]
+                            
+                            st.info(f"**الصوت المختار:** {voice_names[selected_voice_index]}")
+                            st.caption(f"🔑 Voice ID: `{lahajati_voice_id}`")
+                            
+                            if selected_voice.get('preview_url'):
+                                st.markdown("### 🎧 معاينة الصوت")
+                                st.audio(selected_voice['preview_url'])
+                            
+                            with st.expander("🔍 عرض تفاصيل الصوت المختار", expanded=False):
+                                st.json({
+                                    'اسم الصوت': selected_voice.get('voice_name', ''),
+                                    'النوع': selected_voice.get('gender', ''),
+                                    'اللهجة': selected_voice.get('dialect', ''),
+                                    'الوسوم': selected_voice.get('tags', ''),
+                                    'المعرّف': selected_voice.get('id', '')
+                                })
+                            
+                            if lahajati_voice_id:
+                                os.environ['LAHAJATI_VOICE_ID'] = lahajati_voice_id
+                        else:
+                            st.warning("⚠️ لم يتم العثور على أصوات تطابق معايير البحث.")
+                            lahajati_voice_id = None
                     else:
                         st.warning("⚠️ لم نتمكن من جلب قائمة الأصوات. تأكد من صحة API Key.")
                         lahajati_voice_id = st.text_input(
