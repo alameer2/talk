@@ -663,22 +663,49 @@ def main():
                         key=f"preview_slider_{file_name}"
                     )
                     
-                    if st.button("🔊 إنشاء معاينة صوتية", key=f"preview_btn_{file_name}"):
-                        preview_audio = generate_preview(
-                            subtitles[:preview_count],
-                            file_name,
-                            tts_engine,
-                            speech_rate,
-                            pause_duration,
-                            handle_punctuation,
-                            add_tashkeel
-                        )
-                        
-                        if preview_audio:
-                            st.audio(preview_audio, format='audio/mp3')
-                            st.success(f"✅ تم إنشاء معاينة لأول {preview_count} سطور")
-                        else:
-                            st.error("❌ فشل إنشاء المعاينة. تحقق من إعدادات المحرك في الشريط الجانبي.")
+                    preview_disabled = False
+                    error_msg = None
+                    
+                    if "Lahajati" in tts_engine:
+                        if not st.session_state.get('lahajati_api_key'):
+                            preview_disabled = True
+                            error_msg = "⚠️ **مطلوب:** يجب إدخال API Key في إعدادات Lahajati أولاً!"
+                        elif not st.session_state.get('lahajati_voice_id'):
+                            preview_disabled = True
+                            error_msg = "⚠️ **مطلوب:** يجب اختيار صوت من قائمة Lahajati أولاً!"
+                    elif "ElevenLabs" in tts_engine:
+                        if not os.getenv('ELEVENLABS_API_KEY'):
+                            preview_disabled = True
+                            error_msg = "⚠️ **مطلوب:** يجب إدخال API Key في إعدادات ElevenLabs أولاً!"
+                    elif "Azure" in tts_engine:
+                        if not os.getenv('AZURE_SPEECH_KEY'):
+                            preview_disabled = True
+                            error_msg = "⚠️ **مطلوب:** يجب إدخال API Key في إعدادات Azure أولاً!"
+                    elif "AWS" in tts_engine:
+                        if not os.getenv('AWS_ACCESS_KEY_ID'):
+                            preview_disabled = True
+                            error_msg = "⚠️ **مطلوب:** يجب إدخال AWS credentials في إعدادات AWS Polly أولاً!"
+                    
+                    if st.button("🔊 إنشاء معاينة صوتية", key=f"preview_btn_{file_name}", disabled=preview_disabled):
+                        with st.spinner("⏳ جاري إنشاء المعاينة..."):
+                            preview_audio = generate_preview(
+                                subtitles[:preview_count],
+                                file_name,
+                                tts_engine,
+                                speech_rate,
+                                pause_duration,
+                                handle_punctuation,
+                                add_tashkeel
+                            )
+                            
+                            if preview_audio:
+                                st.audio(preview_audio, format='audio/mp3')
+                                st.success(f"✅ تم إنشاء معاينة لأول {preview_count} سطور")
+                            else:
+                                st.error("❌ فشل إنشاء المعاينة. راجع اللوقات أدناه لمعرفة السبب.")
+                    
+                    if error_msg and preview_disabled:
+                        st.error(error_msg)
                 
                 # أزرار التحويل
                 st.markdown("---")
