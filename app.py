@@ -307,8 +307,11 @@ def main():
                             selected_voice = filtered_voices[selected_voice_index]
                             
                             # حفظ Voice ID فوراً
+                            import logging
+                            logging.info(f"SAVING voice_id: {lahajati_voice_id}")
                             st.session_state.lahajati_voice_id = lahajati_voice_id
                             os.environ['LAHAJATI_VOICE_ID'] = lahajati_voice_id
+                            logging.info(f"SAVED to session_state: {st.session_state.lahajati_voice_id}")
                             
                             st.markdown("---")
                             st.success(f"✅ **الصوت المختار:** {voice_names[selected_voice_index]}")
@@ -814,6 +817,9 @@ def generate_preview(subtitles, file_name, tts_engine, speech_rate, pause_durati
 
 def get_engine_type_and_key(tts_engine_name):
     """استخراج نوع المحرك ومفتاح API من اسم المحرك"""
+    import logging
+    logging.info(f"DEBUG START: tts_engine_name = '{tts_engine_name}'")
+    
     api_key = None
     credentials = {}
     
@@ -828,9 +834,13 @@ def get_engine_type_and_key(tts_engine_name):
         
         import logging
         logging.info(f"DEBUG: Lahajati - API Key: {'موجود' if api_key else 'غير موجود'}, Voice ID: {voice_id if voice_id else 'غير موجود'}")
+        logging.info(f"DEBUG: session_state keys: {list(st.session_state.keys())}")
+        logging.info(f"DEBUG: lahajati_voice_id from session: {st.session_state.get('lahajati_voice_id', 'NOT FOUND')}")
         
         if voice_id:
             credentials['voice_id'] = voice_id
+        else:
+            logging.error(f"DEBUG: voice_id is None or empty! session_state.lahajati_voice_id = {st.session_state.get('lahajati_voice_id')}")
     elif "ElevenLabs" in tts_engine_name:
         engine_type = "elevenlabs"
         api_key = os.getenv('ELEVENLABS_API_KEY')
