@@ -39,13 +39,14 @@ class TextProcessor:
         # علامات الترقيم التي تحتاج تنظيف
         self.unwanted_chars = ['«', '»', '"', '"', ''', ''', '`', '~', '^']
     
-    def process_arabic_text(self, text: str, handle_punctuation: bool = True) -> str:
+    def process_arabic_text(self, text: str, handle_punctuation: bool = True, for_tts: bool = True) -> str:
         """
         معالجة شاملة للنص العربي
         
         Args:
             text (str): النص الأصلي
             handle_punctuation (bool): معالجة علامات الترقيم
+            for_tts (bool): إذا كان النص لـ TTS (لا يتم تطبيق RTL)
             
         Returns:
             str: النص بعد المعالجة
@@ -64,8 +65,9 @@ class TextProcessor:
             if handle_punctuation:
                 processed_text = self._process_punctuation(processed_text)
             
-            # تطبيق تشكيل النص العربي إذا كان متاح
-            if ARABIC_PROCESSING_AVAILABLE:
+            # تطبيق تشكيل النص العربي فقط للعرض (ليس لـ TTS)
+            # gTTS يتعامل مع النص العربي بشكل صحيح دون معالجة RTL
+            if not for_tts and ARABIC_PROCESSING_AVAILABLE:
                 processed_text = self._reshape_arabic_text(processed_text)
             
             # تنظيف نهائي
