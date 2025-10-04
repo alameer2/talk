@@ -3757,6 +3757,7 @@ dependencies = [
     { name = "pysrt" },
     { name = "python-bidi" },
     { name = "pyttsx3" },
+    { name = "requests" },
     { name = "streamlit" },
 ]
 
@@ -3769,6 +3770,7 @@ requires-dist = [
     { name = "pysrt", specifier = ">=1.1.2" },
     { name = "python-bidi", specifier = ">=0.6.6" },
     { name = "pyttsx3", specifier = ">=2.99" },
+    { name = "requests", specifier = ">=2.32.5" },
     { name = "streamlit", specifier = ">=1.50.0" },
 ]
 

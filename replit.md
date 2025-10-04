@@ -6,14 +6,16 @@ This is a Python-based SRT (subtitle) to Arabic speech converter application. Th
 
 ## Recent Changes
 
-### October 4, 2025 - Project Import and Setup
+### October 4, 2025 - Project Import and Setup Complete
 - Imported project from GitHub repository
-- Configured Streamlit server to run on port 5000 with proper host settings
+- Configured Streamlit server to run on port 5000 with proper host settings (0.0.0.0:5000)
 - Verified all core dependencies are installed (streamlit, pysrt, pydub, gTTS, pyttsx3, arabic-reshaper, python-bidi, mishkal)
 - Created required directories (upload/, output/, temp/)
-- Configured workflow to run the Streamlit application
-- FFmpeg is available for audio processing
-- Application is now accessible and running successfully
+- Configured workflow to run the Streamlit application using `python -m streamlit`
+- FFmpeg (v7.1.1) and espeak-ng (v1.51.1) are installed and available for audio processing
+- Updated deployment configuration to use `autoscale` deployment target
+- Application is running successfully with Arabic RTL interface fully functional
+- All TTS engines (gTTS, pyttsx3, Lahajati, ElevenLabs, Azure, AWS Polly) are configured and ready
 
 # User Preferences
 
