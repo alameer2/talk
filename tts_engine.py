@@ -110,11 +110,17 @@ class TTSEngine:
                 self.logger.error("gTTS غير متاح")
                 return None
             
+            # تحسين معاملات gTTS للعربية
+            # استخدام slow=True عندما تكون السرعة أقل من 1.0
+            # هذا يحسن دقة النطق للنصوص العربية المشكّلة
+            use_slow = self.speech_rate < 1.0
+            
             # إنشاء كائن gTTS
             tts = gTTS(
                 text=text, 
-                lang='ar', 
-                slow=False if self.speech_rate >= 1.0 else True
+                lang='ar',
+                slow=use_slow,
+                lang_check=True
             )
             
             # حفظ الملف
