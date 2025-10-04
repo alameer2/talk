@@ -36,13 +36,15 @@ Preferred communication style: Simple, everyday language.
 
 3. **TTS Engine Module** (`tts_engine.py`)
    - Multi-engine support with graceful fallbacks:
-     - **gTTS**: Free Google TTS (requires internet)
-     - **pyttsx3**: Local offline TTS
+     - **gTTS**: Free Google TTS (no API key needed)
+     - **pyttsx3**: Local offline TTS (no API key needed)
+     - **Lahajati**: 108 Arabic dialects (free tier: 10k chars/month)
+     - **ElevenLabs**: High-quality AI voices (free tier: 10k chars/month)
      - **Azure Cognitive Services**: Enterprise-grade cloud TTS
-     - **ElevenLabs**: High-quality AI voice synthesis
      - **AWS Polly**: Amazon's text-to-speech service
    - Configurable speech rate and quality settings
-   - API key management for cloud services
+   - Optional API key management for cloud services
+   - Clear UI indication of free vs. paid options
 
 4. **Audio Utilities Module** (`audio_utils.py`)
    - Audio file manipulation using `pydub`
@@ -89,36 +91,57 @@ No authentication system is implemented. The application is designed as a single
 
 ## Text-to-Speech Engines
 
+**Free Engines (No API Key Required):**
+
 1. **gTTS** (Google Text-to-Speech)
    - Free, cloud-based
    - Requires internet connection
-   - No API key needed
+   - No API key or registration needed
+   - **Limitation**: Single voice for Arabic
 
 2. **pyttsx3**
    - Local, offline TTS engine
    - No external dependencies
    - Works without internet
+   - No API key or registration needed
+   - **Limitation**: Limited Arabic support
 
-3. **Azure Cognitive Services** (Optional)
+**Free Tier Engines (API Key Required - Free Registration):**
+
+3. **Lahajati** (NEW)
+   - Specialized in Arabic TTS with 108+ dialects
+   - 500+ professional voices
+   - Free tier: 10,000 characters/month
+   - Requires free registration at lahajati.ai
+   - Studio-quality audio (320kbps)
+   - Multiple Arabic accents (Egyptian, Gulf, Levantine, Maghrebi, etc.)
+
+4. **ElevenLabs**
+   - AI-powered voice synthesis
+   - Free tier: 10,000 characters/month
+   - Requires free registration at elevenlabs.io
+   - High-quality, emotional AI voices
+   - Regional Arabic accents
+
+**Premium Engines (Paid API Required):**
+
+5. **Azure Cognitive Services**
    - Enterprise cloud TTS
    - Requires API key and region configuration
-   - High-quality voices
+   - High-quality voices with multiple Arabic dialects
 
-4. **ElevenLabs** (Optional)
-   - AI-powered voice synthesis
-   - Requires API key
-   - Premium quality output
-
-5. **AWS Polly** (Optional)
+6. **AWS Polly**
    - Amazon's TTS service
    - Requires AWS credentials
-   - Multiple voice options
+   - Multiple voice options including Arabic
 
 ## Optional Enhancement Libraries
 
+- **requests**: HTTP library for API calls (required for Lahajati and other web APIs)
 - **mishkal**: Arabic text vocalization (diacritization)
 - **boto3**: AWS SDK for Polly integration
 - **azure-cognitiveservices-speech**: Azure TTS SDK
+- **elevenlabs**: ElevenLabs Python SDK
 
 ## Platform Requirements
 
