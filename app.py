@@ -288,10 +288,18 @@ def main():
                             voice_names = [v['name'] for v in filtered_voices]
                             voice_ids = [v['id'] for v in filtered_voices]
                             
+                            # إيجاد الفهرس الافتراضي للصوت المحدد مسبقاً
+                            default_index = 0
+                            saved_voice_id = st.session_state.get('lahajati_voice_id')
+                            if saved_voice_id and saved_voice_id in voice_ids:
+                                default_index = voice_ids.index(saved_voice_id)
+                            
                             selected_voice_index = st.selectbox(
                                 "🎤 اختر الصوت:",
                                 range(len(voice_names)),
                                 format_func=lambda i: voice_names[i],
+                                index=default_index,
+                                key="lahajati_voice_selector",
                                 help="اختر الصوت المناسب من القائمة"
                             )
                             
