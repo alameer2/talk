@@ -18,23 +18,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Server"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "Streamlit App"
-
-[[workflows.workflow]]
-name = "Server"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "webview"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "streamlit run app.py --server.port 5000 --server.address 0.0.0.0"
-waitForPort = 5000
 
 [[workflows.workflow]]
 name = "Streamlit App"
@@ -55,7 +39,3 @@ externalPort = 80
 [[ports]]
 localPort = 33993
 externalPort = 3000
-
-[[ports]]
-localPort = 40075
-externalPort = 3001
