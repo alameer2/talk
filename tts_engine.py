@@ -34,6 +34,12 @@ try:
 except ImportError:
     AWS_POLLY_AVAILABLE = False
 
+try:
+    import requests
+    REQUESTS_AVAILABLE = True
+except ImportError:
+    REQUESTS_AVAILABLE = False
+
 class TTSEngine:
     """محرك تحويل النص إلى كلام مع دعم متعدد المحركات"""
     
@@ -42,10 +48,10 @@ class TTSEngine:
         تهيئة محرك TTS
         
         Args:
-            engine_type (str): نوع المحرك ("gtts", "pyttsx3", "azure", "elevenlabs", "polly")
+            engine_type (str): نوع المحرك ("gtts", "pyttsx3", "azure", "elevenlabs", "polly", "lahajati")
             speech_rate (float): سرعة الكلام (1.0 = عادي)
-            api_key (str): مفتاح API للمحركات السحابية
-            credentials (dict): معلومات إضافية للمحركات (مثل region للـ Azure وAWS)
+            api_key (str): مفتاح API للمحركات السحابية (اختياري لبعض المحركات)
+            credentials (dict): معلومات إضافية للمحركات (مثل region للـ Azure وAWS، voice_id لـ Lahajati)
         """
         self.engine_type = engine_type.lower()
         self.speech_rate = speech_rate
@@ -123,6 +129,8 @@ class TTSEngine:
             return self._elevenlabs_convert(text, output_file)
         elif self.engine_type == "polly":
             return self._polly_convert(text, output_file)
+        elif self.engine_type == "lahajati":
+            return self._lahajati_convert(text, output_file)
         else:
             # محاولة استخدام المحرك المتاح
             if GTTS_AVAILABLE:
@@ -373,4 +381,55 @@ class TTSEngine:
                 
         except Exception as e:
             self.logger.error(f"خطأ في AWS Polly: {str(e)}")
+            return None
+    
+    def _lahajati_convert(self, text: str, output_file: str) -> Optional[str]:
+        """تحويل النص باستخدام Lahajati AI (108 لهجة عربية)"""
+        try:
+            if not REQUESTS_AVAILABLE:
+                self.logger.error("requests library غير متاح. قم بتثبيت: pip install requests")
+                return None
+            
+            if not self.api_key:
+                self.logger.error("يجب توفير API Key لـ Lahajati. يمكنك الحصول عليه مجاناً (10k chars/month) من https://lahajati.ai/")
+                return None
+            
+            # الحصول على voice_id من credentials أو استخدام صوت افتراضي
+            voice_id = self.credentials.get('voice_id', 'default_arabic_voice')
+            
+            # إعداد الطلب
+            api_url = 'https://lahajati.ai/api/v1/text-to-speech-pro'
+            headers = {
+                'Authorization': f'Bearer {self.api_key}',
+                'Content-Type': 'application/json',
+                'Accept': 'audio/mpeg'
+            }
+            
+            data = {
+                "text": text,
+                "id_voice": voice_id,
+                "version": "lahajati_text_to_speech_pro_v1"
+            }
+            
+            # إرسال الطلب
+            response = requests.post(api_url, headers=headers, json=data, stream=True, timeout=30)
+            
+            if response.status_code == 200:
+                # حفظ الملف الصوتي
+                with open(output_file, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        if chunk:
+                            f.write(chunk)
+                
+                if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
+                    self.logger.info(f"تم إنشاء ملف صوتي بـ Lahajati: {output_file}")
+                    return output_file
+                else:
+                    return None
+            else:
+                self.logger.error(f"خطأ في Lahajati API: {response.status_code} - {response.text}")
+                return None
+                
+        except Exception as e:
+            self.logger.error(f"خطأ في Lahajati: {str(e)}")
             return None

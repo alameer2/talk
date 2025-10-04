@@ -73,10 +73,11 @@ def main():
         
         # قائمة محركات TTS المتاحة
         tts_engines_list = [
-            "gTTS (جوجل - يحتاج إنترنت)",
+            "gTTS (مجاني - صوت واحد)",
             "pyttsx3 (محلي - بدون إنترنت)",
+            "Lahajati (108 لهجة - 10k مجاناً/شهر)",
+            "ElevenLabs (AI - 10k مجاناً/شهر)",
             "Azure TTS (احترافي - يحتاج API Key)",
-            "ElevenLabs (AI - يحتاج API Key)",
             "AWS Polly (Amazon - يحتاج API Key)"
         ]
         
@@ -112,6 +113,38 @@ def main():
         aws_access_key = None
         aws_secret_key = None
         aws_region = None
+        lahajati_key = None
+        lahajati_voice_id = None
+        
+        if "Lahajati" in tts_engine:
+            st.info("""
+            🎯 **Lahajati:**
+            - **108 لهجة عربية مختلفة** (مصري، خليجي، شامي، مغربي...)
+            - **500+ صوت احترافي** بجودة استوديو
+            - **مجاني: 10,000 حرف/شهر** (بدون بطاقة ائتمان)
+            - سجّل مجاناً على: https://lahajati.ai/
+            """)
+            with st.expander("⚙️ إعدادات Lahajati (اختياري)", expanded=False):
+                lahajati_key = st.text_input(
+                    "Lahajati API Key:",
+                    type="password",
+                    key="lahajati_key",
+                    help="احصل على مفتاح API مجاناً من لوحة التحكم في lahajati.ai"
+                )
+                lahajati_voice_id = st.text_input(
+                    "Voice ID (معرّف الصوت):",
+                    value="",
+                    key="lahajati_voice",
+                    help="يمكنك الحصول على قائمة الأصوات من API endpoint: /voices-absolute-control"
+                )
+                
+                if not lahajati_key:
+                    st.warning("⚠️ يجب توفير API Key لاستخدام Lahajati. سجّل مجاناً على lahajati.ai للحصول على 10,000 حرف/شهر!")
+                
+                if lahajati_key:
+                    os.environ['LAHAJATI_API_KEY'] = lahajati_key
+                    if lahajati_voice_id:
+                        os.environ['LAHAJATI_VOICE_ID'] = lahajati_voice_id
         
         if "Azure" in tts_engine:
             st.info("🎯 **Azure TTS:** أصوات احترافية بجودة عالية جداً.")
@@ -123,9 +156,24 @@ def main():
                     os.environ['AZURE_REGION'] = azure_region
         
         if "ElevenLabs" in tts_engine:
-            st.info("🤖 **ElevenLabs:** أصوات واقعية بتقنية الذكاء الاصطناعي.")
-            with st.expander("⚙️ إعدادات ElevenLabs", expanded=True):
-                elevenlabs_key = st.text_input("ElevenLabs API Key:", type="password", key="elevenlabs_key")
+            st.info("""
+            🤖 **ElevenLabs:**
+            - أصوات واقعية جداً بتقنية AI
+            - **مجاني: 10,000 حرف/شهر**
+            - لهجات عربية إقليمية
+            - سجّل مجاناً على: https://elevenlabs.io/
+            """)
+            with st.expander("⚙️ إعدادات ElevenLabs (اختياري)", expanded=False):
+                elevenlabs_key = st.text_input(
+                    "ElevenLabs API Key:",
+                    type="password",
+                    key="elevenlabs_key",
+                    help="احصل على مفتاح API مجاناً من لوحة التحكم في elevenlabs.io"
+                )
+                
+                if not elevenlabs_key:
+                    st.warning("⚠️ يجب توفير API Key لاستخدام ElevenLabs. سجّل مجاناً على elevenlabs.io للحصول على 10,000 حرف/شهر!")
+                
                 if elevenlabs_key:
                     os.environ['ELEVENLABS_API_KEY'] = elevenlabs_key
         
@@ -530,13 +578,19 @@ def get_engine_type_and_key(tts_engine_name):
         engine_type = "gtts"
     elif "pyttsx3" in tts_engine_name:
         engine_type = "pyttsx3"
+    elif "Lahajati" in tts_engine_name:
+        engine_type = "lahajati"
+        api_key = os.getenv('LAHAJATI_API_KEY')
+        voice_id = os.getenv('LAHAJATI_VOICE_ID')
+        if voice_id:
+            credentials['voice_id'] = voice_id
+    elif "ElevenLabs" in tts_engine_name:
+        engine_type = "elevenlabs"
+        api_key = os.getenv('ELEVENLABS_API_KEY')
     elif "Azure" in tts_engine_name:
         engine_type = "azure"
         api_key = os.getenv('AZURE_SPEECH_KEY')
         credentials['azure_region'] = os.getenv('AZURE_REGION', 'eastus')
-    elif "ElevenLabs" in tts_engine_name:
-        engine_type = "elevenlabs"
-        api_key = os.getenv('ELEVENLABS_API_KEY')
     elif "AWS Polly" in tts_engine_name:
         engine_type = "polly"
         credentials['aws_access_key'] = os.getenv('AWS_ACCESS_KEY_ID')
