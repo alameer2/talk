@@ -17,6 +17,15 @@ This is a Python-based SRT (subtitle) to Arabic speech converter application. Th
 - Application is running successfully with Arabic RTL interface fully functional
 - All TTS engines (gTTS, pyttsx3, Lahajati, ElevenLabs, Azure, AWS Polly) are configured and ready
 
+### October 4, 2025 - Lahajati Integration Bug Fixes
+- **Fixed**: Corrected API field name mapping in `fetch_lahajati_voices()` function
+  - Changed from `voice.get('id', ...)` to `voice.get('id_voice', ...)` to match Lahajati API response
+  - Changed from `voice.get('voice_name', ...)` to `voice.get('display_name', ...)` to match Lahajati API response
+- **Result**: Voice names and IDs now display correctly in the UI
+- Configured LAHAJATI_API_KEY in Replit Secrets for secure API key management
+- Tested and verified TTS conversion works correctly (successfully created 27KB audio file)
+- Created test SRT file for validation (upload/test_lahajati.srt)
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
