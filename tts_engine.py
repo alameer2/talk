@@ -394,8 +394,12 @@ class TTSEngine:
                 self.logger.error("يجب توفير API Key لـ Lahajati. يمكنك الحصول عليه مجاناً (10k chars/month) من https://lahajati.ai/")
                 return None
             
-            # الحصول على voice_id من credentials أو استخدام صوت افتراضي
-            voice_id = self.credentials.get('voice_id', 'default_arabic_voice')
+            # الحصول على voice_id من credentials - يجب أن يكون موجوداً
+            voice_id = self.credentials.get('voice_id', None)
+            
+            if not voice_id:
+                self.logger.error("يجب اختيار صوت من القائمة أولاً. اذهب إلى إعدادات Lahajati واختر الصوت المناسب.")
+                return None
             
             # إعداد الطلب
             api_url = 'https://lahajati.ai/api/v1/text-to-speech-pro'
