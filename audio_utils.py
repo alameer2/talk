@@ -57,6 +57,54 @@ class AudioUtils:
             self.logger.error(f"خطأ في إضافة التوقف: {str(e)}")
             return audio
     
+    def create_timed_segment_optimized(self, audio: AudioSegment, start_silence_ms: float, 
+                                      duration_ms: float, pause_ms: float = 500) -> Optional[AudioSegment]:
+        """
+        إنشاء مقطع صوتي محسّن مع توقيت دقيق وضغط الصمت
+        
+        Args:
+            audio (AudioSegment): المقطع الصوتي
+            start_silence_ms (float): الصمت في البداية (بالميلي ثانية)
+            duration_ms (float): مدة المقطع المطلوبة
+            pause_ms (float): مدة التوقف في النهاية
+            
+        Returns:
+            AudioSegment: المقطع الصوتي المحسّن
+        """
+        if not PYDUB_AVAILABLE or not audio:
+            return None
+        
+        try:
+            # إنشاء صمت مضغوط في البداية
+            if start_silence_ms > 0:
+                # استخدام صمت بمعدل عينات منخفض جداً لتقليل الحجم
+                start_silence = AudioSegment.silent(
+                    duration=int(start_silence_ms),
+                    frame_rate=8000  # معدل عينات منخفض جداً للصمت
+                )
+                # إعادة ضبط معدل العينات ليتوافق مع الصوت
+                start_silence = start_silence.set_frame_rate(audio.frame_rate)
+            else:
+                start_silence = AudioSegment.empty()
+            
+            # إضافة توقف في النهاية
+            if pause_ms > 0:
+                end_pause = AudioSegment.silent(
+                    duration=int(pause_ms),
+                    frame_rate=8000
+                )
+                end_pause = end_pause.set_frame_rate(audio.frame_rate)
+                audio = audio + end_pause
+            
+            # دمج الصمت مع الصوت
+            final_segment = start_silence + audio
+            
+            return final_segment
+            
+        except Exception as e:
+            self.logger.error(f"خطأ في إنشاء المقطع المحسّن: {str(e)}")
+            return None
+    
     def combine_audio_segments(self, segments: List[AudioSegment]) -> Optional[AudioSegment]:
         """
         دمج عدة مقاطع صوتية في ملف واحد
@@ -106,12 +154,32 @@ class AudioUtils:
             # إنشاء مجلد الإخراج
             Path(output_path).parent.mkdir(parents=True, exist_ok=True)
             
-            # تصدير الملف
+            # تصدير الملف مع إعدادات ضغط محسّنة
+            # استخدام VBR (Variable Bitrate) للحصول على ضغط أفضل
+            export_params = [
+                "-ar", "22050",  # معدل عينات معقول للكلام
+                "-ac", "1",      # أحادي القناة (mono) لتقليل الحجم 50%
+            ]
+            
+            # إضافة معاملات ضغط MP3 المتقدمة
+            if format == "mp3":
+                # استخدام VBR بجودة عالية
+                quality = "2"  # جودة عالية (0-9، حيث 0 الأفضل)
+                if bitrate == "64k":
+                    quality = "5"
+                elif bitrate == "192k":
+                    quality = "0"
+                
+                export_params.extend([
+                    "-q:a", quality,  # جودة VBR
+                    "-compression_level", "0",  # أقصى ضغط
+                ])
+            
             audio_segment.export(
                 output_path,
                 format=format,
                 bitrate=bitrate,
-                parameters=["-ar", "16000"]  # معدل عينة منخفض لتقليل الحجم
+                parameters=export_params
             )
             
             # التحقق من نجاح التصدير
