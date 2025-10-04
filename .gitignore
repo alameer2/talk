@@ -58,7 +58,6 @@ temp/
 logs/
 
 # Replit
-.replit
 .upm/
 .cache/
 .pythonlibs/
