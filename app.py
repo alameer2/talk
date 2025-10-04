@@ -116,6 +116,86 @@ def fetch_lahajati_voices(api_key):
         st.error(f"فشل الاتصال بـ Lahajati API: {str(e)}")
         return []
 
+@st.cache_data(ttl=3600)
+def fetch_lahajati_dialects(api_key):
+    """جلب قائمة اللهجات المتاحة من Lahajati API"""
+    try:
+        all_dialects = []
+        page = 1
+        per_page = 50
+        
+        while True:
+            url = f'https://lahajati.ai/api/v1/dialect-absolute-control?page={page}&per_page={per_page}'
+            headers = {
+                'Authorization': f'Bearer {api_key}',
+                'Accept': 'application/json'
+            }
+            
+            response = requests.get(url, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                if 'data' in data and len(data['data']) > 0:
+                    for dialect in data['data']:
+                        all_dialects.append({
+                            'id': dialect.get('dialect_id'),
+                            'name': dialect.get('display_name', '')
+                        })
+                    
+                    if len(data['data']) < per_page:
+                        break
+                    page += 1
+                else:
+                    break
+            else:
+                break
+        
+        return all_dialects
+            
+    except Exception as e:
+        return []
+
+@st.cache_data(ttl=3600)
+def fetch_lahajati_performances(api_key):
+    """جلب قائمة أنواع الأداء المتاحة من Lahajati API"""
+    try:
+        all_performances = []
+        page = 1
+        per_page = 50
+        
+        while True:
+            url = f'https://lahajati.ai/api/v1/performance-absolute-control?page={page}&per_page={per_page}'
+            headers = {
+                'Authorization': f'Bearer {api_key}',
+                'Accept': 'application/json'
+            }
+            
+            response = requests.get(url, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                if 'data' in data and len(data['data']) > 0:
+                    for performance in data['data']:
+                        all_performances.append({
+                            'id': performance.get('performance_id'),
+                            'name': performance.get('display_name', '')
+                        })
+                    
+                    if len(data['data']) < per_page:
+                        break
+                    page += 1
+                else:
+                    break
+            else:
+                break
+        
+        return all_performances
+            
+    except Exception as e:
+        return []
+
 def main():
     create_directories()
     
@@ -338,6 +418,94 @@ def main():
                                     'الوسوم': selected_voice.get('tags', ''),
                                     'المعرّف الكامل': lahajati_voice_id
                                 })
+                            
+                            # الخيارات المتقدمة
+                            with st.expander("⚡ خيارات متقدمة (اختياري)", expanded=False):
+                                st.markdown("""
+                                **التحكم الكامل في الأداء:**
+                                - اختر لهجة محددة (110 لهجة عربية)
+                                - اختر نوع أداء (درامي، إخباري، تجاري، إلخ)
+                                - أو اكتب وصف مخصص للأداء المطلوب
+                                """)
+                                
+                                use_advanced = st.checkbox(
+                                    "🎛️ تفعيل الخيارات المتقدمة",
+                                    value=False,
+                                    help="استخدم Absolute Control API للتحكم الكامل في اللهجة ونوع الأداء"
+                                )
+                                
+                                if use_advanced:
+                                    with st.spinner("🔄 جاري تحميل الخيارات المتقدمة..."):
+                                        dialects_list = fetch_lahajati_dialects(lahajati_key)
+                                        performances_list = fetch_lahajati_performances(lahajati_key)
+                                    
+                                    if dialects_list or performances_list:
+                                        control_mode = st.radio(
+                                            "📍 نوع التحكم:",
+                                            ["تحكم منظم (مُوصى به)", "نص مخصص"],
+                                            help="التحكم المنظم: اختر من قوائم معدّة. النص المخصص: اكتب وصف حر للأداء"
+                                        )
+                                        
+                                        if control_mode == "تحكم منظم (مُوصى به)":
+                                            st.markdown("### اختيار اللهجة ونوع الأداء")
+                                            
+                                            if dialects_list:
+                                                dialect_names = ["بدون تحديد"] + [d['name'] for d in dialects_list]
+                                                dialect_ids = [None] + [d['id'] for d in dialects_list]
+                                                
+                                                selected_dialect_index = st.selectbox(
+                                                    "🗣️ اللهجة:",
+                                                    range(len(dialect_names)),
+                                                    format_func=lambda i: dialect_names[i],
+                                                    help=f"اختر من {len(dialects_list)} لهجة عربية متاحة"
+                                                )
+                                                
+                                                selected_dialect_id = dialect_ids[selected_dialect_index]
+                                                if selected_dialect_id:
+                                                    st.session_state.lahajati_dialect_id = selected_dialect_id
+                                                    os.environ['LAHAJATI_DIALECT_ID'] = str(selected_dialect_id)
+                                                    st.success(f"✅ تم اختيار: {dialect_names[selected_dialect_index]}")
+                                            
+                                            if performances_list:
+                                                perf_names = ["بدون تحديد"] + [p['name'] for p in performances_list]
+                                                perf_ids = [None] + [p['id'] for p in performances_list]
+                                                
+                                                selected_perf_index = st.selectbox(
+                                                    "🎭 نوع الأداء:",
+                                                    range(len(perf_names)),
+                                                    format_func=lambda i: perf_names[i],
+                                                    help=f"اختر من {len(performances_list)} نوع أداء متاح"
+                                                )
+                                                
+                                                selected_perf_id = perf_ids[selected_perf_index]
+                                                if selected_perf_id:
+                                                    st.session_state.lahajati_performance_id = selected_perf_id
+                                                    os.environ['LAHAJATI_PERFORMANCE_ID'] = str(selected_perf_id)
+                                                    st.success(f"✅ تم اختيار: {perf_names[selected_perf_index]}")
+                                        
+                                        else:  # نص مخصص
+                                            st.markdown("### نص مخصص للتحكم بالأداء")
+                                            st.markdown("""
+                                            اكتب وصفاً دقيقاً للأداء المطلوب. أمثلة:
+                                            - "تحدث بفرح مع سرعة متوسطة وطاقة عالية"
+                                            - "نبرة حزينة، بطيئة، طاقة منخفضة"
+                                            - "أسلوب درامي مع تأكيد على الكلمات المهمة"
+                                            """)
+                                            
+                                            custom_prompt = st.text_area(
+                                                "📝 وصف الأداء:",
+                                                value="",
+                                                height=100,
+                                                placeholder="مثال: تحدث بحماس وفرح، مع سرعة متوسطة وطاقة عالية...",
+                                                help="اكتب وصفاً مفصلاً للنبرة، السرعة، العاطفة، والطاقة"
+                                            )
+                                            
+                                            if custom_prompt:
+                                                st.session_state.lahajati_custom_prompt = custom_prompt
+                                                os.environ['LAHAJATI_CUSTOM_PROMPT'] = custom_prompt
+                                                st.success("✅ تم حفظ النص المخصص")
+                                    else:
+                                        st.warning("⚠️ لم نتمكن من تحميل الخيارات المتقدمة")
                         else:
                             st.warning("⚠️ لم يتم العثور على أصوات تطابق معايير البحث.")
                             lahajati_voice_id = None
@@ -832,6 +1000,18 @@ def get_engine_type_and_key(tts_engine_name):
         
         if voice_id:
             credentials['voice_id'] = voice_id
+        
+        # الخيارات المتقدمة
+        dialect_id = st.session_state.get('lahajati_dialect_id') or os.getenv('LAHAJATI_DIALECT_ID')
+        performance_id = st.session_state.get('lahajati_performance_id') or os.getenv('LAHAJATI_PERFORMANCE_ID')
+        custom_prompt = st.session_state.get('lahajati_custom_prompt') or os.getenv('LAHAJATI_CUSTOM_PROMPT')
+        
+        if dialect_id:
+            credentials['dialect_id'] = int(dialect_id) if isinstance(dialect_id, str) else dialect_id
+        if performance_id:
+            credentials['performance_id'] = int(performance_id) if isinstance(performance_id, str) else performance_id
+        if custom_prompt:
+            credentials['custom_prompt'] = custom_prompt
     elif "ElevenLabs" in tts_engine_name:
         engine_type = "elevenlabs"
         api_key = os.getenv('ELEVENLABS_API_KEY')

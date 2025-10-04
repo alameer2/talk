@@ -404,7 +404,21 @@ class TTSEngine:
                     self.logger.error("❌ يجب اختيار صوت من القائمة أولاً. اذهب إلى إعدادات Lahajati في الشريط الجانبي واختر الصوت المناسب.")
                     return None
                 
-                api_url = 'https://lahajati.ai/api/v1/text-to-speech-pro'
+                # التحقق من وجود خيارات متقدمة
+                dialect_id = self.credentials.get('dialect_id', None)
+                performance_id = self.credentials.get('performance_id', None)
+                custom_prompt = self.credentials.get('custom_prompt', None)
+                
+                use_advanced = dialect_id or performance_id or custom_prompt
+                
+                if use_advanced:
+                    # استخدام absolute-control endpoint
+                    api_url = 'https://lahajati.ai/api/v1/text-to-speech-absolute-control'
+                    self.logger.info("🎛️ استخدام Absolute Control API للخيارات المتقدمة")
+                else:
+                    # استخدام pro endpoint العادي
+                    api_url = 'https://lahajati.ai/api/v1/text-to-speech-pro'
+                
                 headers = {
                     'Authorization': f'Bearer {self.api_key}',
                     'Content-Type': 'application/json',
@@ -413,9 +427,25 @@ class TTSEngine:
                 
                 data = {
                     "text": text,
-                    "id_voice": voice_id,
-                    "version": "lahajati_text_to_speech_pro_v1"
+                    "id_voice": voice_id
                 }
+                
+                if use_advanced:
+                    # تحديد نوع التحكم
+                    if custom_prompt:
+                        data["control_mode"] = 1
+                        data["custom_prompt_text"] = custom_prompt
+                        self.logger.info(f"📝 استخدام نص مخصص: {custom_prompt[:50]}...")
+                    else:
+                        data["control_mode"] = 0
+                        if dialect_id:
+                            data["dialect_id"] = dialect_id
+                            self.logger.info(f"🗣️ لهجة محددة: {dialect_id}")
+                        if performance_id:
+                            data["performance_id"] = performance_id
+                            self.logger.info(f"🎭 نوع أداء: {performance_id}")
+                else:
+                    data["version"] = "lahajati_text_to_speech_pro_v1"
                 
                 self.logger.info(f"🔄 محاولة {attempt + 1}/{max_retries} - إرسال طلب إلى Lahajati API...")
                 response = requests.post(api_url, headers=headers, json=data, stream=True, timeout=60)
