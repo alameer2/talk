@@ -298,14 +298,19 @@ def main():
                             lahajati_voice_id = voice_ids[selected_voice_index]
                             selected_voice = filtered_voices[selected_voice_index]
                             
+                            # حفظ Voice ID فوراً
+                            st.session_state.lahajati_voice_id = lahajati_voice_id
+                            os.environ['LAHAJATI_VOICE_ID'] = lahajati_voice_id
+                            
                             st.markdown("---")
                             st.success(f"✅ **الصوت المختار:** {voice_names[selected_voice_index]}")
                             
-                            col1, col2 = st.columns([1, 3])
-                            with col1:
-                                st.markdown("**🔑 Voice ID:**")
-                            with col2:
-                                st.code(lahajati_voice_id, language=None)
+                            # عرض Voice ID بشكل واضح
+                            st.info("🔑 **معرّف الصوت (Voice ID):**")
+                            st.code(lahajati_voice_id, language=None)
+                            
+                            # تأكيد الحفظ
+                            st.success("✅ تم حفظ Voice ID - يمكنك الآن استخدام المعاينة والتحويل!")
                             
                             st.markdown("---")
                             
@@ -319,12 +324,8 @@ def main():
                                     'النوع': selected_voice.get('gender', ''),
                                     'اللهجة': selected_voice.get('dialect', ''),
                                     'الوسوم': selected_voice.get('tags', ''),
-                                    'المعرّف': selected_voice.get('id', '')
+                                    'المعرّف الكامل': lahajati_voice_id
                                 })
-                            
-                            if lahajati_voice_id:
-                                st.session_state.lahajati_voice_id = lahajati_voice_id
-                                os.environ['LAHAJATI_VOICE_ID'] = lahajati_voice_id
                         else:
                             st.warning("⚠️ لم يتم العثور على أصوات تطابق معايير البحث.")
                             lahajati_voice_id = None
