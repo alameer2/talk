@@ -130,6 +130,12 @@ def main():
     if 'edited_texts' not in st.session_state:
         st.session_state.edited_texts = {}
     
+    # تهيئة session state لإعدادات TTS
+    if 'lahajati_voice_id' not in st.session_state:
+        st.session_state.lahajati_voice_id = None
+    if 'lahajati_api_key' not in st.session_state:
+        st.session_state.lahajati_api_key = None
+    
     # العنوان الرئيسي
     st.title("🎙️ محول ملفات الترجمة SRT إلى كلام عربي")
     st.markdown("---")
@@ -235,6 +241,7 @@ def main():
                     st.info("📝 سجّل مجاناً على [lahajati.ai](https://lahajati.ai/) للحصول على 10,000 حرف/شهر!")
                     lahajati_voice_id = None
                 else:
+                    st.session_state.lahajati_api_key = lahajati_key
                     os.environ['LAHAJATI_API_KEY'] = lahajati_key
                     
                     with st.spinner("🔄 جاري تحميل قائمة الأصوات..."):
@@ -308,6 +315,7 @@ def main():
                                 })
                             
                             if lahajati_voice_id:
+                                st.session_state.lahajati_voice_id = lahajati_voice_id
                                 os.environ['LAHAJATI_VOICE_ID'] = lahajati_voice_id
                         else:
                             st.warning("⚠️ لم يتم العثور على أصوات تطابق معايير البحث.")
@@ -765,8 +773,8 @@ def get_engine_type_and_key(tts_engine_name):
         engine_type = "pyttsx3"
     elif "Lahajati" in tts_engine_name:
         engine_type = "lahajati"
-        api_key = os.getenv('LAHAJATI_API_KEY')
-        voice_id = os.getenv('LAHAJATI_VOICE_ID')
+        api_key = st.session_state.get('lahajati_api_key') or os.getenv('LAHAJATI_API_KEY')
+        voice_id = st.session_state.get('lahajati_voice_id') or os.getenv('LAHAJATI_VOICE_ID')
         if voice_id:
             credentials['voice_id'] = voice_id
     elif "ElevenLabs" in tts_engine_name:
