@@ -645,9 +645,15 @@ def main():
                     
                     # تحذير خاص لـ Lahajati
                     if "Lahajati" in tts_engine:
-                        lahajati_voice_check = os.getenv('LAHAJATI_VOICE_ID')
-                        if not lahajati_voice_check:
+                        lahajati_voice_check = st.session_state.get('lahajati_voice_id')
+                        lahajati_api_check = st.session_state.get('lahajati_api_key')
+                        
+                        if not lahajati_api_check:
+                            st.error("⚠️ **مطلوب:** يجب إدخال API Key في إعدادات Lahajati في الشريط الجانبي!")
+                        elif not lahajati_voice_check:
                             st.warning("⚠️ **مطلوب:** يجب اختيار صوت من قائمة Lahajati في الشريط الجانبي أولاً!")
+                        else:
+                            st.success(f"✅ الصوت المحدد: {lahajati_voice_check[:20]}...")
                     
                     preview_count = st.slider(
                         "عدد السطور للمعاينة:",
@@ -775,6 +781,10 @@ def get_engine_type_and_key(tts_engine_name):
         engine_type = "lahajati"
         api_key = st.session_state.get('lahajati_api_key') or os.getenv('LAHAJATI_API_KEY')
         voice_id = st.session_state.get('lahajati_voice_id') or os.getenv('LAHAJATI_VOICE_ID')
+        
+        import logging
+        logging.info(f"DEBUG: Lahajati - API Key: {'موجود' if api_key else 'غير موجود'}, Voice ID: {voice_id if voice_id else 'غير موجود'}")
+        
         if voice_id:
             credentials['voice_id'] = voice_id
     elif "ElevenLabs" in tts_engine_name:
