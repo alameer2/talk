@@ -69,8 +69,8 @@ def fetch_lahajati_voices(api_key):
                 
                 if 'data' in data and len(data['data']) > 0:
                     for voice in data['data']:
-                        voice_id = voice.get('id', voice.get('voice_id', ''))
-                        voice_name = voice.get('voice_name', voice.get('name', voice.get('display_name', '')))
+                        voice_id = voice.get('id_voice', voice.get('id', voice.get('voice_id', '')))
+                        voice_name = voice.get('display_name', voice.get('voice_name', voice.get('name', '')))
                         
                         if not voice_name or voice_name.strip() == '':
                             voice_name = f"صوت {voice_id[:8]}" if voice_id else "صوت غير معروف"
