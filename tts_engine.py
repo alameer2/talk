@@ -16,24 +16,48 @@ try:
 except ImportError:
     PYTTSX3_AVAILABLE = False
 
+try:
+    import azure.cognitiveservices.speech as speechsdk
+    AZURE_AVAILABLE = True
+except ImportError:
+    AZURE_AVAILABLE = False
+
+try:
+    from elevenlabs import generate, set_api_key, Voice
+    ELEVENLABS_AVAILABLE = True
+except ImportError:
+    ELEVENLABS_AVAILABLE = False
+
+try:
+    import boto3
+    AWS_POLLY_AVAILABLE = True
+except ImportError:
+    AWS_POLLY_AVAILABLE = False
+
 class TTSEngine:
     """محرك تحويل النص إلى كلام مع دعم متعدد المحركات"""
     
-    def __init__(self, engine_type: str = "gtts", speech_rate: float = 1.0):
+    def __init__(self, engine_type: str = "gtts", speech_rate: float = 1.0, api_key: str = None, credentials: dict = None):
         """
         تهيئة محرك TTS
         
         Args:
-            engine_type (str): نوع المحرك ("gtts" أو "pyttsx3")
+            engine_type (str): نوع المحرك ("gtts", "pyttsx3", "azure", "elevenlabs", "polly")
             speech_rate (float): سرعة الكلام (1.0 = عادي)
+            api_key (str): مفتاح API للمحركات السحابية
+            credentials (dict): معلومات إضافية للمحركات (مثل region للـ Azure وAWS)
         """
         self.engine_type = engine_type.lower()
         self.speech_rate = speech_rate
+        self.api_key = api_key
+        self.credentials = credentials or {}
         self.logger = logging.getLogger(__name__)
         
         # تهيئة محرك pyttsx3 إذا كان مطلوب
         if self.engine_type == "pyttsx3":
             self._init_pyttsx3()
+        elif self.engine_type == "elevenlabs" and api_key:
+            self._init_elevenlabs()
     
     def _init_pyttsx3(self):
         """تهيئة محرك pyttsx3"""
@@ -93,6 +117,12 @@ class TTSEngine:
             return self._gtts_convert(text, output_file)
         elif self.engine_type == "pyttsx3":
             return self._pyttsx3_convert(text, output_file)
+        elif self.engine_type == "azure":
+            return self._azure_convert(text, output_file)
+        elif self.engine_type == "elevenlabs":
+            return self._elevenlabs_convert(text, output_file)
+        elif self.engine_type == "polly":
+            return self._polly_convert(text, output_file)
         else:
             # محاولة استخدام المحرك المتاح
             if GTTS_AVAILABLE:
@@ -195,7 +225,10 @@ class TTSEngine:
             'speech_rate': self.speech_rate,
             'available_engines': self.get_available_engines(),
             'gtts_available': GTTS_AVAILABLE,
-            'pyttsx3_available': PYTTSX3_AVAILABLE
+            'pyttsx3_available': PYTTSX3_AVAILABLE,
+            'azure_available': AZURE_AVAILABLE,
+            'elevenlabs_available': ELEVENLABS_AVAILABLE,
+            'polly_available': AWS_POLLY_AVAILABLE
         }
         
         if self.engine_type == "pyttsx3" and hasattr(self, 'pyttsx3_engine') and self.pyttsx3_engine:
@@ -208,3 +241,136 @@ class TTSEngine:
                 pass
         
         return info
+    
+    def _init_elevenlabs(self):
+        """تهيئة محرك ElevenLabs"""
+        try:
+            if not ELEVENLABS_AVAILABLE:
+                raise ImportError("ElevenLabs غير متاح")
+            
+            if self.api_key:
+                set_api_key(self.api_key)
+                self.logger.info("تم تهيئة ElevenLabs بنجاح")
+            else:
+                self.logger.error("يجب توفير API Key لـ ElevenLabs")
+                
+        except Exception as e:
+            self.logger.error(f"خطأ في تهيئة ElevenLabs: {str(e)}")
+    
+    def _azure_convert(self, text: str, output_file: str) -> Optional[str]:
+        """تحويل النص باستخدام Azure Cognitive Services"""
+        try:
+            if not AZURE_AVAILABLE:
+                self.logger.error("Azure SDK غير متاح. قم بتثبيت: pip install azure-cognitiveservices-speech")
+                return None
+            
+            if not self.api_key:
+                self.logger.error("يجب توفير AZURE_SPEECH_KEY")
+                return None
+            
+            azure_region = self.credentials.get('azure_region', os.getenv('AZURE_REGION', 'eastus'))
+            
+            # إعداد تكوين Azure
+            speech_config = speechsdk.SpeechConfig(
+                subscription=self.api_key,
+                region=azure_region
+            )
+            
+            # اختيار صوت عربي
+            speech_config.speech_synthesis_voice_name = "ar-SA-ZariyahNeural"
+            speech_config.speech_synthesis_output_format = speechsdk.SpeechSynthesisOutputFormat.Audio16Khz32KBitRateMonoMp3
+            
+            # إنشاء مُركِّب الكلام
+            audio_config = speechsdk.audio.AudioOutputConfig(filename=output_file)
+            synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=audio_config)
+            
+            # تحويل النص
+            result = synthesizer.speak_text_async(text).get()
+            
+            if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
+                self.logger.info(f"تم إنشاء ملف صوتي بـ Azure: {output_file}")
+                return output_file
+            else:
+                self.logger.error(f"فشل Azure TTS: {result.reason}")
+                return None
+                
+        except Exception as e:
+            self.logger.error(f"خطأ في Azure TTS: {str(e)}")
+            return None
+    
+    def _elevenlabs_convert(self, text: str, output_file: str) -> Optional[str]:
+        """تحويل النص باستخدام ElevenLabs"""
+        try:
+            if not ELEVENLABS_AVAILABLE:
+                self.logger.error("ElevenLabs غير متاح")
+                return None
+            
+            if not self.api_key:
+                self.logger.error("يجب توفير API Key لـ ElevenLabs")
+                return None
+            
+            # إنشاء الصوت
+            audio = generate(
+                text=text,
+                voice="Rachel",
+                model="eleven_multilingual_v2"
+            )
+            
+            # حفظ الملف
+            with open(output_file, 'wb') as f:
+                f.write(audio)
+            
+            if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
+                self.logger.info(f"تم إنشاء ملف صوتي بـ ElevenLabs: {output_file}")
+                return output_file
+            else:
+                return None
+                
+        except Exception as e:
+            self.logger.error(f"خطأ في ElevenLabs: {str(e)}")
+            return None
+    
+    def _polly_convert(self, text: str, output_file: str) -> Optional[str]:
+        """تحويل النص باستخدام AWS Polly"""
+        try:
+            if not AWS_POLLY_AVAILABLE:
+                self.logger.error("boto3 غير متاح. قم بتثبيت: pip install boto3")
+                return None
+            
+            aws_access = self.credentials.get('aws_access_key', os.getenv('AWS_ACCESS_KEY_ID'))
+            aws_secret = self.credentials.get('aws_secret_key', os.getenv('AWS_SECRET_ACCESS_KEY'))
+            aws_region = self.credentials.get('aws_region', os.getenv('AWS_REGION', 'us-east-1'))
+            
+            if not aws_access or not aws_secret:
+                self.logger.error("يجب توفير AWS Access Key و Secret Key")
+                return None
+            
+            # إنشاء عميل Polly
+            polly_client = boto3.client(
+                'polly',
+                aws_access_key_id=aws_access,
+                aws_secret_access_key=aws_secret,
+                region_name=aws_region
+            )
+            
+            # تحويل النص إلى كلام
+            response = polly_client.synthesize_speech(
+                Text=text,
+                OutputFormat='mp3',
+                VoiceId='Zeina',
+                LanguageCode='arb'
+            )
+            
+            # حفظ الملف
+            if 'AudioStream' in response:
+                with open(output_file, 'wb') as f:
+                    f.write(response['AudioStream'].read())
+                
+                self.logger.info(f"تم إنشاء ملف صوتي بـ AWS Polly: {output_file}")
+                return output_file
+            else:
+                return None
+                
+        except Exception as e:
+            self.logger.error(f"خطأ في AWS Polly: {str(e)}")
+            return None

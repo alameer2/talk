@@ -4,6 +4,7 @@ import tempfile
 import shutil
 from pathlib import Path
 import time
+import json
 
 # استيراد الوحدات المخصصة
 from srt_processor import SRTProcessor
@@ -26,8 +27,38 @@ def create_directories():
     for directory in directories:
         Path(directory).mkdir(exist_ok=True)
 
+def load_user_preferences():
+    """تحميل إعدادات المستخدم المحفوظة"""
+    prefs_file = Path("user_preferences.json")
+    if prefs_file.exists():
+        try:
+            with open(prefs_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except:
+            pass
+    return {}
+
+def save_user_preferences(preferences):
+    """حفظ إعدادات المستخدم"""
+    try:
+        with open("user_preferences.json", 'w', encoding='utf-8') as f:
+            json.dump(preferences, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        st.warning(f"تعذر حفظ الإعدادات: {str(e)}")
+
 def main():
     create_directories()
+    
+    # تحميل الإعدادات المحفوظة
+    if 'preferences_loaded' not in st.session_state:
+        st.session_state.preferences = load_user_preferences()
+        st.session_state.preferences_loaded = True
+    
+    # تهيئة session state للترجمات القابلة للتحرير
+    if 'editable_subtitles' not in st.session_state:
+        st.session_state.editable_subtitles = None
+    if 'edited_texts' not in st.session_state:
+        st.session_state.edited_texts = {}
     
     # العنوان الرئيسي
     st.title("🎙️ محول ملفات الترجمة SRT إلى كلام عربي")
@@ -39,10 +70,22 @@ def main():
         
         # إعدادات الصوت
         st.subheader("🔊 إعدادات الصوت")
+        
+        # قائمة محركات TTS المتاحة
+        tts_engines_list = [
+            "gTTS (جوجل - يحتاج إنترنت)",
+            "pyttsx3 (محلي - بدون إنترنت)",
+            "Azure TTS (احترافي - يحتاج API Key)",
+            "ElevenLabs (AI - يحتاج API Key)",
+            "AWS Polly (Amazon - يحتاج API Key)"
+        ]
+        
+        default_engine = st.session_state.preferences.get('tts_engine', 0)
         tts_engine = st.selectbox(
             "محرك تحويل النص إلى كلام:",
-            ["gTTS (جوجل - يحتاج إنترنت)", "pyttsx3 (محلي - بدون إنترنت)"],
-            help="gTTS يوفر جودة صوت أفضل لكن يحتاج إنترنت"
+            tts_engines_list,
+            index=default_engine if default_engine < len(tts_engines_list) else 0,
+            help="اختر محرك التحويل المناسب"
         )
         
         # تحذير حول قيود gTTS مع العربية
@@ -62,42 +105,85 @@ def main():
             يُنصح باستخدام gTTS للحصول على نتائج أفضل.
             """)
         
+        # إعدادات API للمحركات السحابية
+        azure_key = None
+        azure_region = None
+        elevenlabs_key = None
+        aws_access_key = None
+        aws_secret_key = None
+        aws_region = None
+        
+        if "Azure" in tts_engine:
+            st.info("🎯 **Azure TTS:** أصوات احترافية بجودة عالية جداً.")
+            with st.expander("⚙️ إعدادات Azure", expanded=True):
+                azure_key = st.text_input("Azure Speech Key:", type="password", key="azure_key")
+                azure_region = st.text_input("Azure Region:", value="eastus", key="azure_region")
+                if azure_key:
+                    os.environ['AZURE_SPEECH_KEY'] = azure_key
+                    os.environ['AZURE_REGION'] = azure_region
+        
+        if "ElevenLabs" in tts_engine:
+            st.info("🤖 **ElevenLabs:** أصوات واقعية بتقنية الذكاء الاصطناعي.")
+            with st.expander("⚙️ إعدادات ElevenLabs", expanded=True):
+                elevenlabs_key = st.text_input("ElevenLabs API Key:", type="password", key="elevenlabs_key")
+                if elevenlabs_key:
+                    os.environ['ELEVENLABS_API_KEY'] = elevenlabs_key
+        
+        if "AWS Polly" in tts_engine:
+            st.info("☁️ **AWS Polly:** خدمة Amazon لتحويل النص إلى كلام.")
+            with st.expander("⚙️ إعدادات AWS", expanded=True):
+                aws_access_key = st.text_input("AWS Access Key ID:", type="password", key="aws_access")
+                aws_secret_key = st.text_input("AWS Secret Access Key:", type="password", key="aws_secret")
+                aws_region = st.text_input("AWS Region:", value="us-east-1", key="aws_region")
+                if aws_access_key and aws_secret_key:
+                    os.environ['AWS_ACCESS_KEY_ID'] = aws_access_key
+                    os.environ['AWS_SECRET_ACCESS_KEY'] = aws_secret_key
+                    os.environ['AWS_REGION'] = aws_region
+        
+        default_speed = st.session_state.preferences.get('speech_rate', 0.9)
         speech_rate = st.slider(
             "سرعة الكلام:",
             min_value=0.5,
             max_value=2.0,
-            value=0.9,
+            value=default_speed,
             step=0.1,
             help="للحصول على نطق أفضل للعربية، استخدم 0.8-0.9 (سرعة أقل = نطق أوضح)"
         )
         
         # إعدادات الإخراج
         st.subheader("📁 إعدادات الإخراج")
+        
+        default_format = st.session_state.preferences.get('output_format', 0)
         output_format = st.selectbox(
             "نوع الإخراج:",
             ["ملف صوتي واحد متكامل", "ملفات منفصلة لكل سطر ترجمة"],
+            index=default_format,
             help="اختر طريقة تنظيم ملفات الصوت"
         )
         
+        default_quality = st.session_state.preferences.get('audio_quality', 1)
         audio_quality = st.selectbox(
             "جودة الصوت:",
             ["عالية (192 kbps)", "متوسطة (128 kbps)", "منخفضة (64 kbps)"],
-            index=1
+            index=default_quality
         )
         
         # إعدادات متقدمة
         st.subheader("🔧 إعدادات متقدمة")
+        
+        default_pause = st.session_state.preferences.get('pause_duration', 0.5)
         pause_duration = st.slider(
             "مدة التوقف بين الجمل (ثانية):",
             min_value=0.0,
             max_value=3.0,
-            value=0.5,
+            value=default_pause,
             step=0.1
         )
         
+        default_punctuation = st.session_state.preferences.get('handle_punctuation', True)
         handle_punctuation = st.checkbox(
             "معالجة علامات الترقيم",
-            value=True,
+            value=default_punctuation,
             help="إضافة توقف طبيعي عند الفواصل وعلامات التعجب"
         )
         
@@ -105,50 +191,115 @@ def main():
         from text_processor import TASHKEEL_AVAILABLE
         
         if TASHKEEL_AVAILABLE:
+            default_tashkeel = st.session_state.preferences.get('add_tashkeel', True)
             add_tashkeel = st.checkbox(
                 "إضافة التشكيل التلقائي ✅",
-                value=True,
+                value=default_tashkeel,
                 help="إضافة الحركات (التشكيل) للنص العربي لتحسين النطق الصحيح - يُنصح بتفعيله للحصول على نطق دقيق"
             )
         else:
             st.warning("⚠️ محرك التشكيل غير متوفر - سيتم تخطي التشكيل")
             add_tashkeel = False
+        
+        # زر حفظ الإعدادات
+        st.markdown("---")
+        if st.button("💾 حفظ الإعدادات الحالية"):
+            preferences = {
+                'tts_engine': tts_engines_list.index(tts_engine),
+                'speech_rate': speech_rate,
+                'output_format': ["ملف صوتي واحد متكامل", "ملفات منفصلة لكل سطر ترجمة"].index(output_format),
+                'audio_quality': ["عالية (192 kbps)", "متوسطة (128 kbps)", "منخفضة (64 kbps)"].index(audio_quality),
+                'pause_duration': pause_duration,
+                'handle_punctuation': handle_punctuation,
+                'add_tashkeel': add_tashkeel
+            }
+            save_user_preferences(preferences)
+            st.session_state.preferences = preferences
+            st.success("✅ تم حفظ الإعدادات بنجاح!")
     
     # المحتوى الرئيسي
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        st.header("📁 رفع ملف الترجمة SRT")
+        st.header("📁 رفع ملفات الترجمة SRT")
         
-        # خيارات رفع الملف
-        upload_method = st.radio(
-            "طريقة رفع الملف:",
-            ["رفع مباشر", "من مجلد upload"],
-            horizontal=True
+        # نوع المعالجة
+        processing_mode = st.radio(
+            "نوع المعالجة:",
+            ["ملف واحد", "معالجة دفعية (متعددة)"],
+            horizontal=True,
+            help="اختر بين معالجة ملف واحد أو عدة ملفات دفعة واحدة"
         )
         
-        srt_file = None
+        srt_files_list = []
         
-        if upload_method == "رفع مباشر":
-            srt_file = st.file_uploader(
-                "اختر ملف SRT:",
-                type=['srt'],
-                help="حدد ملف الترجمة بصيغة SRT"
+        if processing_mode == "ملف واحد":
+            # خيارات رفع ملف واحد
+            upload_method = st.radio(
+                "طريقة رفع الملف:",
+                ["رفع مباشر", "من مجلد upload"],
+                horizontal=True
             )
-        else:
-            # عرض الملفات في مجلد upload
-            upload_dir = Path("upload")
-            srt_files = list(upload_dir.glob("*.srt"))
             
-            if srt_files:
-                selected_file = st.selectbox(
-                    "اختر ملف من مجلد upload:",
-                    [f.name for f in srt_files]
+            srt_file = None
+            
+            if upload_method == "رفع مباشر":
+                srt_file = st.file_uploader(
+                    "اختر ملف SRT:",
+                    type=['srt'],
+                    help="حدد ملف الترجمة بصيغة SRT"
                 )
-                if selected_file:
-                    srt_file = upload_dir / selected_file
+                if srt_file:
+                    srt_files_list = [srt_file]
             else:
-                st.info("لا توجد ملفات SRT في مجلد upload")
+                # عرض الملفات في مجلد upload
+                upload_dir = Path("upload")
+                srt_files = list(upload_dir.glob("*.srt"))
+                
+                if srt_files:
+                    selected_file = st.selectbox(
+                        "اختر ملف من مجلد upload:",
+                        [f.name for f in srt_files]
+                    )
+                    if selected_file:
+                        srt_file = upload_dir / selected_file
+                        srt_files_list = [srt_file]
+                else:
+                    st.info("لا توجد ملفات SRT في مجلد upload")
+        else:
+            # معالجة دفعية
+            batch_upload_method = st.radio(
+                "طريقة رفع الملفات:",
+                ["رفع مباشر", "من مجلد upload"],
+                horizontal=True,
+                key="batch_upload"
+            )
+            
+            if batch_upload_method == "رفع مباشر":
+                uploaded_files = st.file_uploader(
+                    "اختر ملفات SRT متعددة:",
+                    type=['srt'],
+                    accept_multiple_files=True,
+                    help="يمكنك اختيار عدة ملفات مرة واحدة"
+                )
+                if uploaded_files:
+                    srt_files_list = uploaded_files
+            else:
+                # عرض جميع الملفات في مجلد upload
+                upload_dir = Path("upload")
+                available_files = list(upload_dir.glob("*.srt"))
+                
+                if available_files:
+                    st.info(f"📂 تم العثور على {len(available_files)} ملف في مجلد upload")
+                    selected_files = st.multiselect(
+                        "اختر الملفات للمعالجة:",
+                        [f.name for f in available_files],
+                        default=[f.name for f in available_files]
+                    )
+                    if selected_files:
+                        srt_files_list = [upload_dir / f for f in selected_files]
+                else:
+                    st.info("لا توجد ملفات SRT في مجلد upload")
     
     with col2:
         st.header("ℹ️ معلومات المشروع")
@@ -171,64 +322,230 @@ def main():
         فعّل "التشكيل التلقائي" للحصول على نطق أفضل ودقة أعلى
         """)
     
-    # معالجة الملف
-    if srt_file is not None:
+    # معالجة الملفات
+    if srt_files_list:
         st.markdown("---")
-        st.header("🔄 معالجة الملف")
         
-        # قراءة الملف
-        try:
-            if isinstance(srt_file, str) or isinstance(srt_file, Path):
-                # ملف من مجلد upload
-                file_content = open(srt_file, 'r', encoding='utf-8').read()
-                file_name = Path(srt_file).stem
+        # معالجة كل ملف
+        for file_idx, srt_file in enumerate(srt_files_list):
+            if processing_mode == "معالجة دفعية (متعددة)":
+                st.header(f"🔄 معالجة الملف {file_idx + 1} من {len(srt_files_list)}")
             else:
-                # ملف مرفوع مباشرة
-                file_content = str(srt_file.read(), 'utf-8')
-                file_name = srt_file.name.split('.')[0]
+                st.header("🔄 معالجة الملف")
             
-            # معالج SRT
-            processor = SRTProcessor()
-            subtitles = processor.parse_srt_content(file_content)
+            # قراءة الملف
+            try:
+                if isinstance(srt_file, str) or isinstance(srt_file, Path):
+                    # ملف من مجلد upload
+                    file_content = open(srt_file, 'r', encoding='utf-8').read()
+                    file_name = Path(srt_file).stem
+                else:
+                    # ملف مرفوع مباشرة
+                    file_content = str(srt_file.read(), 'utf-8')
+                    file_name = srt_file.name.split('.')[0]
+                
+                # معالج SRT
+                processor = SRTProcessor()
+                subtitles = processor.parse_srt_content(file_content)
+                
+                if not subtitles:
+                    st.error(f"❌ لم يتم العثور على ترجمات صالحة في الملف: {file_name}")
+                    continue
+                
+                # حفظ الترجمات في session state
+                st.session_state.editable_subtitles = subtitles
+                
+                # عرض معلومات الملف
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("عدد السطور", len(subtitles))
+                with col2:
+                    total_duration = max([sub['end_time'] for sub in subtitles]) if subtitles else 0
+                    st.metric("المدة الإجمالية", f"{total_duration:.1f}s")
+                with col3:
+                    total_chars = sum([len(sub['text']) for sub in subtitles])
+                    st.metric("عدد الأحرف", total_chars)
+                
+                # إنشاء tabs للمعاينة والتحرير
+                tab1, tab2, tab3 = st.tabs(["📝 معاينة", "✏️ تحرير النص", "🎧 معاينة صوتية"])
+                
+                with tab1:
+                    # معاينة النص
+                    st.subheader("معاينة محتوى الملف")
+                    for i, sub in enumerate(subtitles[:10]):  # أول 10 سطور
+                        st.write(f"**{i+1}.** [{sub['start_time']:.1f}s - {sub['end_time']:.1f}s] {sub['text']}")
+                    if len(subtitles) > 10:
+                        st.write(f"... و {len(subtitles) - 10} سطر آخر")
+                
+                with tab2:
+                    # تحرير النص
+                    st.subheader("تحرير نصوص الترجمة")
+                    st.info("💡 يمكنك تعديل النصوص هنا قبل التحويل إلى كلام")
+                    
+                    # عرض أول 10 سطور قابلة للتحرير
+                    num_to_show = min(10, len(subtitles))
+                    for i in range(num_to_show):
+                        sub = subtitles[i]
+                        key = f"{file_name}_sub_{i}"
+                        
+                        # استخدام النص المحرر إذا كان موجوداً، وإلا استخدم النص الأصلي
+                        current_text = st.session_state.edited_texts.get(key, sub['text'])
+                        
+                        edited_text = st.text_area(
+                            f"السطر {i+1} [{sub['start_time']:.1f}s - {sub['end_time']:.1f}s]",
+                            value=current_text,
+                            key=key,
+                            height=60
+                        )
+                        
+                        # حفظ النص المحرر
+                        st.session_state.edited_texts[key] = edited_text
+                        subtitles[i]['text'] = edited_text
+                    
+                    if len(subtitles) > 10:
+                        st.info(f"📌 يمكنك تحرير أول 10 سطور. باقي {len(subtitles) - 10} سطر سيتم معالجتها كما هي.")
+                
+                with tab3:
+                    # معاينة صوتية
+                    st.subheader("🎧 استماع لعينة صوتية")
+                    st.info("استمع إلى أول 3 سطور لضبط الإعدادات قبل التحويل الكامل")
+                    
+                    preview_count = st.slider(
+                        "عدد السطور للمعاينة:",
+                        min_value=1,
+                        max_value=min(5, len(subtitles)),
+                        value=min(3, len(subtitles)),
+                        key=f"preview_slider_{file_name}"
+                    )
+                    
+                    if st.button("🔊 إنشاء معاينة صوتية", key=f"preview_btn_{file_name}"):
+                        preview_audio = generate_preview(
+                            subtitles[:preview_count],
+                            file_name,
+                            tts_engine,
+                            speech_rate,
+                            pause_duration,
+                            handle_punctuation,
+                            add_tashkeel
+                        )
+                        
+                        if preview_audio:
+                            st.audio(preview_audio, format='audio/mp3')
+                            st.success(f"✅ تم إنشاء معاينة لأول {preview_count} سطور")
+                
+                # أزرار التحويل
+                st.markdown("---")
+                col_btn1, col_btn2 = st.columns(2)
+                
+                with col_btn1:
+                    if st.button(f"🚀 بدء التحويل الكامل", type="primary", key=f"convert_btn_{file_name}"):
+                        convert_to_speech(
+                            subtitles, 
+                            file_name, 
+                            tts_engine, 
+                            speech_rate, 
+                            output_format, 
+                            audio_quality, 
+                            pause_duration, 
+                            handle_punctuation,
+                            add_tashkeel
+                        )
+                
+                with col_btn2:
+                    if st.button(f"🔄 إعادة تحميل الملف", key=f"reset_btn_{file_name}"):
+                        # مسح التعديلات
+                        for i in range(len(subtitles)):
+                            key = f"{file_name}_sub_{i}"
+                            if key in st.session_state.edited_texts:
+                                del st.session_state.edited_texts[key]
+                        st.rerun()
             
-            if not subtitles:
-                st.error("❌ لم يتم العثور على ترجمات صالحة في الملف")
-                return
+            except Exception as e:
+                st.error(f"❌ خطأ في قراءة الملف {file_name}: {str(e)}")
             
-            # عرض معلومات الملف
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("عدد السطور", len(subtitles))
-            with col2:
-                total_duration = max([sub['end_time'] for sub in subtitles]) if subtitles else 0
-                st.metric("المدة الإجمالية", f"{total_duration:.1f}s")
-            with col3:
-                total_chars = sum([len(sub['text']) for sub in subtitles])
-                st.metric("عدد الأحرف", total_chars)
-            
-            # معاينة النص
-            with st.expander("معاينة محتوى الملف", expanded=False):
-                for i, sub in enumerate(subtitles[:5]):  # أول 5 سطور
-                    st.write(f"**{i+1}.** [{sub['start_time']:.1f}s - {sub['end_time']:.1f}s] {sub['text']}")
-                if len(subtitles) > 5:
-                    st.write(f"... و {len(subtitles) - 5} سطر آخر")
-            
-            # زر بدء التحويل
-            if st.button("🚀 بدء التحويل إلى كلام", type="primary"):
-                convert_to_speech(
-                    subtitles, 
-                    file_name, 
-                    tts_engine, 
-                    speech_rate, 
-                    output_format, 
-                    audio_quality, 
-                    pause_duration, 
-                    handle_punctuation,
-                    add_tashkeel
-                )
+            # فاصل بين الملفات في حالة المعالجة الدفعية
+            if processing_mode == "معالجة دفعية (متعددة)" and file_idx < len(srt_files_list) - 1:
+                st.markdown("---")
+
+def generate_preview(subtitles, file_name, tts_engine, speech_rate, pause_duration, handle_punctuation, add_tashkeel=False):
+    """إنشاء معاينة صوتية لعدد محدود من السطور"""
+    try:
+        # إعداد محرك TTS
+        engine_type, api_key, credentials = get_engine_type_and_key(tts_engine)
+        tts = TTSEngine(engine_type, speech_rate, api_key, credentials)
         
-        except Exception as e:
-            st.error(f"❌ خطأ في قراءة الملف: {str(e)}")
+        # معالج النصوص
+        text_proc = TextProcessor()
+        
+        # معالج الصوت
+        audio_util = AudioUtils()
+        
+        # إنشاء ملفات صوتية للمعاينة
+        audio_segments = []
+        
+        for i, subtitle in enumerate(subtitles):
+            # معالجة النص
+            processed_text = text_proc.process_arabic_text(
+                subtitle['text'], 
+                handle_punctuation,
+                for_tts=True,
+                add_tashkeel=add_tashkeel
+            )
+            
+            if processed_text.strip():
+                # تحويل إلى كلام
+                audio_file = tts.text_to_speech(processed_text, f"temp/preview_{i}.wav")
+                
+                if audio_file:
+                    # تحميل الملف الصوتي
+                    audio = audio_util.load_audio(audio_file)
+                    if audio:
+                        # إضافة توقف صغير بين السطور
+                        audio_with_pause = audio_util.add_pause(audio, pause_duration * 1000)
+                        if audio_with_pause:
+                            audio_segments.append(audio_with_pause)
+        
+        if audio_segments:
+            # دمج المقاطع
+            final_audio = audio_util.combine_audio_segments(audio_segments)
+            
+            # حفظ الملف
+            preview_path = f"temp/preview_{file_name}.mp3"
+            audio_util.export_audio(final_audio, preview_path, "128k")
+            
+            return preview_path
+        
+        return None
+        
+    except Exception as e:
+        st.error(f"❌ خطأ في إنشاء المعاينة: {str(e)}")
+        return None
+
+def get_engine_type_and_key(tts_engine_name):
+    """استخراج نوع المحرك ومفتاح API من اسم المحرك"""
+    api_key = None
+    credentials = {}
+    
+    if "gTTS" in tts_engine_name:
+        engine_type = "gtts"
+    elif "pyttsx3" in tts_engine_name:
+        engine_type = "pyttsx3"
+    elif "Azure" in tts_engine_name:
+        engine_type = "azure"
+        api_key = os.getenv('AZURE_SPEECH_KEY')
+        credentials['azure_region'] = os.getenv('AZURE_REGION', 'eastus')
+    elif "ElevenLabs" in tts_engine_name:
+        engine_type = "elevenlabs"
+        api_key = os.getenv('ELEVENLABS_API_KEY')
+    elif "AWS Polly" in tts_engine_name:
+        engine_type = "polly"
+        credentials['aws_access_key'] = os.getenv('AWS_ACCESS_KEY_ID')
+        credentials['aws_secret_key'] = os.getenv('AWS_SECRET_ACCESS_KEY')
+        credentials['aws_region'] = os.getenv('AWS_REGION', 'us-east-1')
+    else:
+        engine_type = "gtts"
+    
+    return engine_type, api_key, credentials
 
 def convert_to_speech(subtitles, file_name, tts_engine, speech_rate, output_format, audio_quality, pause_duration, handle_punctuation, add_tashkeel=False):
     """تحويل الترجمات إلى كلام"""
@@ -239,8 +556,8 @@ def convert_to_speech(subtitles, file_name, tts_engine, speech_rate, output_form
     
     try:
         # إعداد محرك TTS
-        engine_type = "gtts" if "gTTS" in tts_engine else "pyttsx3"
-        tts = TTSEngine(engine_type, speech_rate)
+        engine_type, api_key, credentials = get_engine_type_and_key(tts_engine)
+        tts = TTSEngine(engine_type, speech_rate, api_key, credentials)
         
         # معالج النصوص
         text_proc = TextProcessor()
