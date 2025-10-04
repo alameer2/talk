@@ -1,8 +1,7 @@
-# Python
+*.pyc
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
+*.class
 .Python
 build/
 develop-eggs/
@@ -16,61 +15,16 @@ parts/
 sdist/
 var/
 wheels/
-pip-wheel-metadata/
-share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-MANIFEST
-
-# Virtual Environment
+.env
+.venv
+env/
 venv/
 ENV/
-env/
-.venv
-
-# Streamlit
+env.bak/
+venv.bak/
 .streamlit/secrets.toml
-
-# Project specific
-upload/*.srt
-output/
 temp/
-*.mp3
-*.wav
-*.zip
-
-# Keep directory structure
-!upload/.gitkeep
-!output/.gitkeep
-!temp/.gitkeep
-
-# IDEs
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-
-# Logs
-*.log
-logs/
-
-# Replit
-.upm/
-.cache/
-.pythonlibs/
-.local/
-
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-
-# Environment variables
-.env
-.env.local
-
-# System files
-Thumbs.db
+user_preferences.json
