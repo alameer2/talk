@@ -10,11 +10,26 @@ try:
 except ImportError:
     ARABIC_PROCESSING_AVAILABLE = False
 
+try:
+    from mishkal.tashkeel import TashkeelClass
+    TASHKEEL_AVAILABLE = True
+except ImportError:
+    TASHKEEL_AVAILABLE = False
+
 class TextProcessor:
     """معالج النصوص العربية وعلامات الترقيم"""
     
     def __init__(self):
         self.logger = logging.getLogger(__name__)
+        
+        # تهيئة محرك التشكيل
+        self.tashkeel_engine = None
+        if TASHKEEL_AVAILABLE:
+            try:
+                self.tashkeel_engine = TashkeelClass()
+                self.logger.info("تم تهيئة محرك التشكيل بنجاح")
+            except Exception as e:
+                self.logger.warning(f"فشل تهيئة محرك التشكيل: {str(e)}")
         
         # قاموس علامات الترقيم وتأثيرها على التوقف
         self.punctuation_pauses = {
@@ -39,7 +54,29 @@ class TextProcessor:
         # علامات الترقيم التي تحتاج تنظيف
         self.unwanted_chars = ['«', '»', '"', '"', ''', ''', '`', '~', '^']
     
-    def process_arabic_text(self, text: str, handle_punctuation: bool = True, for_tts: bool = True) -> str:
+    def add_tashkeel(self, text: str) -> str:
+        """
+        إضافة التشكيل التلقائي للنص العربي
+        
+        Args:
+            text (str): النص بدون تشكيل
+            
+        Returns:
+            str: النص مع التشكيل
+        """
+        if not text or not self.tashkeel_engine:
+            return text
+        
+        try:
+            # إضافة التشكيل باستخدام mishkal
+            vocalized_text = self.tashkeel_engine.tashkeel(text)
+            self.logger.info("تم إضافة التشكيل للنص بنجاح")
+            return vocalized_text
+        except Exception as e:
+            self.logger.error(f"خطأ في إضافة التشكيل: {str(e)}")
+            return text
+    
+    def process_arabic_text(self, text: str, handle_punctuation: bool = True, for_tts: bool = True, add_tashkeel: bool = False) -> str:
         """
         معالجة شاملة للنص العربي
         
@@ -47,6 +84,7 @@ class TextProcessor:
             text (str): النص الأصلي
             handle_punctuation (bool): معالجة علامات الترقيم
             for_tts (bool): إذا كان النص لـ TTS (لا يتم تطبيق RTL)
+            add_tashkeel (bool): إضافة التشكيل التلقائي
             
         Returns:
             str: النص بعد المعالجة
@@ -57,6 +95,10 @@ class TextProcessor:
         try:
             # تنظيف أولي
             processed_text = self._clean_text(text)
+            
+            # إضافة التشكيل قبل معالجة الأرقام والترقيم
+            if add_tashkeel and self.tashkeel_engine:
+                processed_text = self.add_tashkeel(processed_text)
             
             # معالجة الأرقام
             processed_text = self._process_numbers(processed_text)
